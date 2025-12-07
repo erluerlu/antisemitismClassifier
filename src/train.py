@@ -11,6 +11,7 @@ from sklearn.utils.class_weight import compute_class_weight
 from datasets import DatasetDict
 from .dataset import load_nli_dataset
 from .hypotheses import NLI_LABEL2ID
+import torch
 
 @dataclass
 class Config:
@@ -18,8 +19,8 @@ class Config:
     output_dir: str = "checkpoints/xlmr-nli"
     lr: float = 2e-5
     epochs: int = 3
-    batch_size: int = 4  # Reduziert auf 4 für MacBook MPS
-    gradient_accumulation_steps: int = 2  # Simuliert effektiv batch size 8
+    batch_size: int = 16  
+    gradient_accumulation_steps: int = 8 
     weight_decay: float = 0.01
     warmup_ratio: float = 0.06
     seed: int = 42
@@ -84,7 +85,6 @@ def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_fro
             raise ValueError("'labels' not found in batch inputs. Available keys: " + str(list(inputs.keys())))
         outputs = model(**inputs)
         logits = outputs.logits
-        import torch
         loss_fct = torch.nn.CrossEntropyLoss(weight=torch.tensor(weights, device=logits.device))
         loss = loss_fct(logits.view(-1, num_labels), labels.view(-1))
         return (loss, outputs) if return_outputs else loss
@@ -107,7 +107,6 @@ def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_fro
         metric_for_best_model="f1",
         seed=cfg.seed,
         report_to=[],
-        #use_cpu=True,  # Nutze CPU statt MPS/GPU für MacBook Speicher
     )
 
     trainer = Trainer(
@@ -151,3 +150,6 @@ if __name__ == "__main__":
     # Stage 2: DE (weiterfeintunen vom EN‑Checkpoint)
     cfg.output_dir = os.path.join(cfg.output_dir, "de_ft")
     _ = train_stage(args_.de_train, args_.de_val, "de", cfg, resume_from=en_out)
+
+    print(torch.cuda.is_available())
+    print(torch.cuda.get_device_name(0))
