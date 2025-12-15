@@ -19,7 +19,7 @@ class Config:
     model_name: str = "xlm-roberta-base"
     output_dir: str = "checkpoints/xlmr-nli"
     lr: float = 2e-5
-    epochs: int = 3
+    epochs: int = 8
     batch_size: int = 16  
     gradient_accumulation_steps: int = 8 
     weight_decay: float = 0.01
@@ -81,11 +81,19 @@ def class_weights_from_dataset(ds, num_labels: int) -> np.ndarray:
         Array of class weights for loss function
     """
     y = np.array(ds["nli_label"])
-    # Classes 0, 1, 2 → weights
-    weights = compute_class_weight(class_weight="balanced",
-                                   classes=np.arange(num_labels),
-                                   y=y)
-    return weights.astype(np.float32)
+    unique_classes = np.unique(y)  # Nur tatsächlich vorhandene Klassen
+    
+    # Berechne Gewichte nur für vorhandene Klassen
+    weights_dict = compute_class_weight(class_weight="balanced",
+                                        classes=unique_classes,
+                                        y=y)
+    
+    # Erstelle vollständiges Gewichte-Array mit 1.0 als Default für fehlende Klassen
+    weights = np.ones(num_labels, dtype=np.float32)
+    for cls, weight in zip(unique_classes, weights_dict):
+        weights[cls] = weight
+    
+    return weights
 
 def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_from: str | None, test_size: float | None = None):
     """
@@ -154,7 +162,7 @@ def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_fro
         save_strategy="steps" if val_ds else "no",
         logging_steps=100,
         save_steps=500,
-        eval_steps=500,
+        eval_steps=100,
         load_best_model_at_end=True if val_ds else False,
         metric_for_best_model="f1",
         seed=cfg.seed,

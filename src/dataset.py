@@ -24,7 +24,9 @@ def expand_to_nli(df: pd.DataFrame, lang: str) -> pd.DataFrame:
         for cls, hyp_dict in HYPOTHESES.items():
             hyp = hyp_dict[lang]
             
-            nli_label = "entailment" if cls == gold else "neutral"
+            # Wenn Hypothese der echten Klasse entspricht: entailment
+            # Sonst: contradiction (nicht neutral, da wir nur 2 Labels haben)
+            nli_label = "entailment" if cls == gold else "contradiction"
             rows.append({
                 "premise": text,
                 "hypothesis": hyp,
