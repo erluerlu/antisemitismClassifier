@@ -1,7 +1,7 @@
 HYPOTHESES = {
     "1": {
-        "en": "The text contains classical antisemitism.",
-        "de": "Der Text enthält klassischen Antisemitismus."
+        "en": "The text contains antisemitism.",
+        "de": "Der Text enthält Antisemitismus."
     },
     "0": {
         "en": "The text is not antisemitic.",
