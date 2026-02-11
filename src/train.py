@@ -1,5 +1,7 @@
 import os
 import numpy as np
+import pandas as pd
+import tempfile
 from dataclasses import dataclass
 from typing import Dict
 from transformers import (
@@ -8,6 +10,7 @@ from transformers import (
 )
 import evaluate
 from sklearn.utils.class_weight import compute_class_weight
+from sklearn.model_selection import train_test_split
 from datasets import DatasetDict
 from .dataset import load_nli_dataset
 from .hypotheses import NLI_LABEL2ID
@@ -95,27 +98,78 @@ def class_weights_from_dataset(ds, num_labels: int) -> np.ndarray:
     
     return weights
 
-def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_from: str | None, test_size: float | None = None):
+def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_from: str | None, val_size: float | None = None, hold_test_size: float | None = None):
     """
     Trains or fine-tunes an NLI model for bias detection.
     
     Args:
         train_csv: Path to training CSV file
-        val_csv: Path to validation CSV file (ignored if test_size is set)
+        val_csv: Path to validation CSV file (ignored if val_size is set)
         lang: Language code ('en' or 'de')
         cfg: Training configuration
         resume_from: Path to checkpoint to resume from, or None to start fresh
-        test_size: If specified (e.g., 0.2), automatically splits train_csv into train/val.
-                   When set, val_csv is ignored.
+        val_size: If specified (e.g., 0.15), automatically splits train_csv into train/val.
+                  When set, val_csv is ignored.
+        hold_test_size: If specified (e.g., 0.15), holds out a test set that is NOT used 
+                        for training/validation. This test set will be returned for final evaluation.
     
     Returns:
-        Path to the saved model checkpoint
+        Tuple of (checkpoint_path, test_csv_path, lang) where test_csv_path is None if hold_test_size is None
     """
     tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
+    test_ds = None
+    test_csv_path = None
 
-    if test_size is not None:
-        # Automatic split
-        split_data = load_nli_dataset(train_csv, lang, test_size=test_size, seed=cfg.seed)
+    # Step 1: Load data and potentially hold out test set
+    if hold_test_size is not None:
+        print(f"\n{'='*80}")
+        print(f"Holding out {hold_test_size*100:.0f}% of data as test set (NOT used for training)")
+        print(f"{'='*80}")
+        
+        # Load original CSV and split BEFORE NLI expansion
+        df_original = pd.read_csv(train_csv)
+        df_original = df_original.dropna(subset=["Text", "Biased"])
+        
+        # Stratified split on original data
+        train_val_df, test_df = train_test_split(
+            df_original,
+            test_size=hold_test_size,
+            random_state=cfg.seed,
+            stratify=df_original['Biased']
+        )
+        
+        # Save test CSV temporarily
+        test_csv_path = train_csv.replace('.csv', '_test_holdout.csv')
+        test_df.to_csv(test_csv_path, index=False)
+        print(f"Test CSV saved: {test_csv_path} ({len(test_df)} original samples)")
+        
+        # Save train+val CSV temporarily
+        train_val_csv_path = train_csv.replace('.csv', '_train_val.csv')
+        train_val_df.to_csv(train_val_csv_path, index=False)
+        
+        # Now load as NLI datasets
+        full_split = load_nli_dataset(train_val_csv_path, lang, test_size=None, seed=cfg.seed)
+        train_val_ds = full_split
+        test_ds = load_nli_dataset(test_csv_path, lang, test_size=None, seed=cfg.seed)
+        print(f"Test set: {len(test_ds)} NLI samples (held out for final evaluation)")
+        
+        # Step 2: Split remaining data into train/val
+        if val_size is not None:
+            # Calculate relative val_size for the remaining data
+            relative_val_size = val_size / (1 - hold_test_size)
+            print(f"Splitting remaining {len(train_val_ds)} NLI samples into train/val ({(1-relative_val_size)*100:.0f}%/{relative_val_size*100:.0f}%)")
+            train_val_split = train_val_ds.train_test_split(test_size=relative_val_size, seed=cfg.seed)
+            train_ds = train_val_split["train"]
+            val_ds = train_val_split["test"]
+            print(f"Train set: {len(train_ds)} NLI samples")
+            print(f"Validation set: {len(val_ds)} NLI samples")
+        else:
+            train_ds = train_val_ds
+            val_ds = None
+            print(f"Train set: {len(train_ds)} NLI samples (no validation set)")
+    elif val_size is not None:
+        # No test set hold-out, just train/val split
+        split_data = load_nli_dataset(train_csv, lang, test_size=val_size, seed=cfg.seed)
         train_ds = split_data["train"]
         val_ds = split_data["test"]
     else:
@@ -190,27 +244,71 @@ def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_fro
     best_dir = args.output_dir
     trainer.save_model(best_dir)
     tokenizer.save_pretrained(best_dir)
-    return best_dir
+    
+    # Return checkpoint path, test CSV path, and language
+    return best_dir, test_csv_path, lang
 
 if __name__ == "__main__":
     import argparse, os
+    from .evaluate import evaluate_with_analysis
+    
     parser = argparse.ArgumentParser()
     parser.add_argument("--en_train", required=True, help="Path to English training CSV")
-    parser.add_argument("--en_val", required=False, default="", help="Path to English validation CSV (optional if --test_size is used)")
+    parser.add_argument("--en_val", required=False, default="", help="Path to English validation CSV (optional if --val_size is used)")
     parser.add_argument("--de_train", required=True, help="Path to German training CSV")
-    parser.add_argument("--de_val", required=False, default="", help="Path to German validation CSV (optional if --test_size is used)")
+    parser.add_argument("--de_val", required=False, default="", help="Path to German validation CSV (optional if --val_size is used)")
     parser.add_argument("--model_name", default="xlm-roberta-base")
-    parser.add_argument("--test_size", type=float, default=0.2, help="Ratio for automatic train/val split (e.g., 0.2). Ignores *_val arguments.")
+    parser.add_argument("--val_size", type=float, default=0.15, help="Ratio for validation split (e.g., 0.15 = 15%%). Ignores *_val arguments.")
+    parser.add_argument("--test_size", type=float, default=0.15, help="Ratio for test set hold-out (e.g., 0.15 = 15%%). This data is NOT used for training.")
+    parser.add_argument("--skip_evaluation", action="store_true", help="Skip automatic evaluation on test set after training")
+    parser.add_argument("--show_examples", type=int, default=10, help="Number of error examples to show in evaluation (default: 10)")
     args_ = parser.parse_args()
 
     cfg = Config(model_name=args_.model_name)
 
     # Stage 1: English training
-    en_out = train_stage(args_.en_train, args_.en_val, "en", cfg, resume_from=None, test_size=args_.test_size)
+    print("\n" + "="*80)
+    print("STAGE 1: ENGLISH TRAINING")
+    print("="*80)
+    en_out, en_test_csv, en_lang = train_stage(
+        args_.en_train, args_.en_val, "en", cfg, 
+        resume_from=None, 
+        val_size=args_.val_size,
+        hold_test_size=args_.test_size
+    )
 
     # Stage 2: German fine-tuning from English checkpoint
+    print("\n" + "="*80)
+    print("STAGE 2: GERMAN FINE-TUNING")
+    print("="*80)
     cfg.output_dir = os.path.join(cfg.output_dir, "de_ft")
-    _ = train_stage(args_.de_train, args_.de_val, "de", cfg, resume_from=en_out, test_size=args_.test_size)
+    de_out, de_test_csv, de_lang = train_stage(
+        args_.de_train, args_.de_val, "de", cfg, 
+        resume_from=en_out, 
+        val_size=args_.val_size,
+        hold_test_size=args_.test_size
+    )
 
-    print(torch.cuda.is_available())
-    print(torch.cuda.get_device_name(0))
+    # Automatic evaluation on held-out test sets with detailed analysis
+    if not args_.skip_evaluation:
+        print("\n" + "="*80)
+        print("FINAL EVALUATION ON HELD-OUT TEST SETS")
+        print("="*80)
+        
+        if en_test_csv is not None:
+            print("\n" + "-"*80)
+            print("Evaluating English model on held-out test set...")
+            print("-"*80)
+            evaluate_with_analysis(en_out, en_test_csv, en_lang, show_examples=args_.show_examples)
+        
+        if de_test_csv is not None:
+            print("\n" + "-"*80)
+            print("Evaluating German model on held-out test set...")
+            print("-"*80)
+            evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples)
+
+    print("\n" + "="*80)
+    print("TRAINING COMPLETE")
+    print("="*80)
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
