@@ -14,6 +14,7 @@ from sklearn.model_selection import train_test_split
 from datasets import DatasetDict
 from .dataset import load_nli_dataset
 from .hypotheses import NLI_LABEL2ID
+from .tokenizer_utils import load_tokenizer
 import torch
 
 @dataclass
@@ -116,7 +117,7 @@ def train_stage(train_csv: str, val_csv: str, lang: str, cfg: Config, resume_fro
     Returns:
         Tuple of (checkpoint_path, test_csv_path, lang) where test_csv_path is None if hold_test_size is None
     """
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
+    tokenizer = load_tokenizer(cfg.model_name)
     test_ds = None
     test_csv_path = None
 

@@ -1,13 +1,14 @@
 import numpy as np
 import torch
 import pandas as pd
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer
+from transformers import AutoModelForSequenceClassification, Trainer
 from datasets import Dataset
 import evaluate
 from sklearn.metrics import confusion_matrix, classification_report
 from .dataset import load_nli_dataset
 from .train import compute_metrics, tokenize_fn
 from .hypotheses import HYPOTHESES, NLI_LABEL2ID
+from .tokenizer_utils import load_tokenizer
 import argparse
 
 @torch.no_grad()
@@ -62,7 +63,7 @@ def evaluate_with_analysis(checkpoint_path: str, test_csv: str, lang: str, show_
     print("-" * 80)
     
     # Load tokenizer and model
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+    tokenizer = load_tokenizer(checkpoint_path)
     model = AutoModelForSequenceClassification.from_pretrained(checkpoint_path)
     
     # Load original CSV data
@@ -188,7 +189,7 @@ def evaluate_on_dataset(checkpoint_path: str, test_dataset: Dataset, lang: str =
     print("-" * 80)
     
     # Load tokenizer and model
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+    tokenizer = load_tokenizer(checkpoint_path)
     model = AutoModelForSequenceClassification.from_pretrained(checkpoint_path)
     
     # Tokenize test data
@@ -240,7 +241,7 @@ def evaluate_checkpoint(checkpoint_path: str, test_csv: str, lang: str):
     print("-" * 80)
     
     # Load tokenizer and model
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+    tokenizer = load_tokenizer(checkpoint_path)
     model = AutoModelForSequenceClassification.from_pretrained(checkpoint_path)
     
     # Load test data

@@ -210,4 +210,5 @@ __marimo__/
 checkpoints/
 
 .vscode/
-src/__pycache__
+
+src/__pycache__/

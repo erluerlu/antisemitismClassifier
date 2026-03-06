@@ -1,11 +1,12 @@
 import torch
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification
 from .hypotheses import HYPOTHESES, NLI_LABEL2ID
+from .tokenizer_utils import load_tokenizer
 
 @torch.no_grad()
 def predict_label(text: str, lang: str, ckpt_dir: str):
-    tok = AutoTokenizer.from_pretrained(ckpt_dir)
+    tok = load_tokenizer(ckpt_dir)
     mdl = AutoModelForSequenceClassification.from_pretrained(ckpt_dir)
     mdl.eval()
 
