@@ -1,11 +1,11 @@
 HYPOTHESES = {
     "1": {
-        "en": "antisemitic",
-        "de": "antisemitisch."
+        "en": "antisemitic following IHRA definition",
+        "de": "antisemitisch nach IHRA-Definition."
     },
     "0": {
-        "en": "not antisemitic",
-        "de": "nicht antisemitisch."
+        "en": "not antisemitic following IHRA definition",
+        "de": "nicht antisemitisch nach IHRA-Definition."
     }
 }
 

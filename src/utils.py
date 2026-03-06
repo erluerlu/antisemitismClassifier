@@ -1,7 +1,18 @@
+from pydoc import text
 import re
 import emoji
 import pandas as pd
 from stopwords import get_stopwords
+
+
+def _normalize_text(value):
+    text = str(value)
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text)
+    text = emoji.replace_emoji(text, replace='')
+    text = re.sub(r'@\w+', '', text)
+    text = re.sub(r'&\w+;', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 def clean_text_advanced(csv_path):
     """
@@ -24,32 +35,40 @@ def clean_text_advanced(csv_path):
             * URLs (http, https, www)
             * Emojis
             * Mentions (@username)
-            * Hashtags (#word)
             * HTML entities (&entity;)
             * Multiple consecutive whitespaces
     """
 
     df = pd.read_csv(csv_path)
     df = df.dropna(subset=["Text", "Biased"])
+    df['Text'] = df['Text'].apply(_normalize_text)
 
-    for index, row in df.iterrows():
-        text = row["Text"]
-
-# Remove URLs
-    text = re.sub(r'http\S+|www\S+|https\S+', '', text)
-    # Remove emojis (more precise)
-    text = emoji.replace_emoji(text, replace='')
-    # Remove mentions (@username)
-    text = re.sub(r'@\w+', '', text)
-    # Remove hashtags (optional)
-    text = re.sub(r'#\w+', '', text)
-    # Remove HTML entities
-    text = re.sub(r'&\w+;', '', text)
-    # Remove multiple spaces
-    text = re.sub(r'\s+', ' ', text).strip()
-
-        
     df.to_csv(f'{csv_path.split(".")[0]}_cleaned.csv', index=False)
+
+def clean_text_hard(csv_path):
+    """
+    Delete all tweets from dataset where the text contains any of the following:
+    - URLs (http, https, www)
+    - Mentions (@username)
+    
+    all remaining elements are clened as in clean_text_advanced (emojis, HTML entities, multiple spaces)
+
+    the new file is saved with suffix "_cleaned_hard.csv"
+    """
+    df = pd.read_csv(csv_path)
+    df = df.dropna(subset=["Text", "Biased"])
+
+    def is_clean(text):
+        if re.search(r'http\S+|www\S+|https\S+', text):
+            return False
+        if re.search(r'@\w+', text):
+            return False
+        return True
+
+    df = df[df['Text'].apply(is_clean)].copy()
+    df['Text'] = df['Text'].apply(_normalize_text)
+
+    df.to_csv(f'{csv_path.split(".")[0]}_cleaned_hard.csv', index=False)
 
 
 def frequencyAnalysis(csv_files=None, top_n=20, language='all', exclude_stopwords=True):
@@ -122,7 +141,9 @@ def main():
     #clean_text_advanced(csv_path)
     
     # Word frequency analysis
-    frequencyAnalysis(top_n=25)
+    #frequencyAnalysis(top_n=25)
+    clean_text_hard("data/de.csv")
+    clean_text_hard("data/en.csv")
 
 if __name__ == "__main__":
     main()
