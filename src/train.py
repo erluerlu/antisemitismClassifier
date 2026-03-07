@@ -45,6 +45,7 @@ class Config:
     threshold_min_precision: float = 0.20
     model_selection_objective: str = "recall_at_precision"
     model_selection_min_precision: float = 0.20
+    model_selection_last_k_checkpoints: int = 3
 
 
 def _print_class_distribution(name: str, df: pd.DataFrame):
@@ -389,7 +390,11 @@ def train_stage(
                     current_checkpoints.append(path)
         current_checkpoints.sort(key=lambda p: int(os.path.basename(p).split("-")[-1]))
 
-        # Prefer checkpoints produced in this run; add HF-selected best checkpoint as a safety candidate.
+        # Prefer checkpoints produced in this run; only score the latest K to reduce runtime.
+        if cfg.model_selection_last_k_checkpoints > 0 and len(current_checkpoints) > cfg.model_selection_last_k_checkpoints:
+            current_checkpoints = current_checkpoints[-cfg.model_selection_last_k_checkpoints :]
+
+        # Add HF-selected best checkpoint as a safety candidate (if not already in latest K).
         run_candidates: list[str] = []
         if trainer.state.best_model_checkpoint and os.path.isdir(trainer.state.best_model_checkpoint):
             run_candidates.append(trainer.state.best_model_checkpoint)
@@ -551,6 +556,12 @@ if __name__ == "__main__":
         default=0.20,
         help="Minimum precision constraint for model selection objective recall_at_precision.",
     )
+    parser.add_argument(
+        "--model_selection_last_k_checkpoints",
+        type=int,
+        default=3,
+        help="Only score the latest K checkpoint-* directories from current run (0 disables limit).",
+    )
     parser.add_argument("--skip_evaluation", action="store_true", help="Skip automatic evaluation on test set after training")
     parser.add_argument(
         "--show_examples",
@@ -568,6 +579,7 @@ if __name__ == "__main__":
         threshold_min_precision=args_.threshold_min_precision,
         model_selection_objective=args_.model_selection_objective,
         model_selection_min_precision=args_.model_selection_min_precision,
+        model_selection_last_k_checkpoints=args_.model_selection_last_k_checkpoints,
     )
 
     print("\n" + "=" * 80)

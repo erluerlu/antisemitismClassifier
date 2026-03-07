@@ -23,9 +23,11 @@ Pipeline stages:
 
 ### 3. Checkpoint selection (tweet-level)
 - During each stage, checkpoints are scored on tweet-level metrics on validation data.
+- To reduce runtime, only the latest `K` checkpoints from the current run are scored (default `K=3`).
 - Best checkpoint is selected using:
     - `--model_selection_objective` (default: `recall_at_precision`)
     - `--model_selection_min_precision` (default: `0.20`)
+    - `--model_selection_last_k_checkpoints` (default: `3`, use `0` to disable limit)
 
 ### 4. Threshold calibration (tweet-level)
 - A decision threshold on margin `(score_1 - score_0)` is tuned on validation tweets.
@@ -66,6 +68,7 @@ C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --en_tra
 - `--threshold_min_precision` (default: `0.20`)
 - `--model_selection_objective` (`f1|recall|recall_at_precision`, default: `recall_at_precision`)
 - `--model_selection_min_precision` (default: `0.20`)
+- `--model_selection_last_k_checkpoints` (default: `3`, `0` = score all)
 - `--skip_evaluation` (flag)
 - `--show_examples` (default: `10`)
 
