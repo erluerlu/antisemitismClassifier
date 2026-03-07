@@ -1,156 +1,108 @@
 # Antisemitism Classifier - Training & Evaluation Guide
 
-## Automated Train/Val/Test Pipeline
+## Overview
 
-The training pipeline now automatically performs the following steps:
+The current training pipeline is optimized for tweet-level detection quality on the positive class (antisemitic = `1`), with explicit recall/precision control.
 
-### 1. Data Splitting
-- **Test Set Hold-out**: 15% of data is separated BEFORE training
-- **Validation Set**: 15% of remaining data for early stopping
-- **Training Set**: 70% of data for actual training
+Pipeline stages:
+- Stage 1: English training (`en`)
+- Stage 2: German fine-tuning (`de`) from stage 1 checkpoint
+- Optional automatic evaluation on held-out test sets
 
-### 2. Training
-- Stage 1: English base training
-- Stage 2: German fine-tuning
+## Current Training Logic
 
-### 3. Automatic Evaluation
-After training, the models are automatically evaluated on **unseen test sets**.
+### 1. Leak-free splitting
+- Splits are done on original tweet rows BEFORE NLI expansion.
+- Default split settings:
+    - `--test_size 0.15`
+    - `--val_size 0.15`
 
-## Usage
+### 2. Imbalance handling (current defaults)
+- Positive oversampling: `--pos_oversample_factor 5.0`
+- Positive loss weighting: `--positive_sample_weight 5.0`
 
-### Training with Automatic Evaluation
+### 3. Checkpoint selection (tweet-level)
+- During each stage, checkpoints are scored on tweet-level metrics on validation data.
+- Best checkpoint is selected using:
+    - `--model_selection_objective` (default: `recall_at_precision`)
+    - `--model_selection_min_precision` (default: `0.20`)
 
-```bash
-python -m src.train \
-    --en_train data/en_cleaned.csv \
-    --de_train data/de_cleaned.csv \
-    --val_size 0.15 \
-    --test_size 0.15
-```
+### 4. Threshold calibration (tweet-level)
+- A decision threshold on margin `(score_1 - score_0)` is tuned on validation tweets.
+- Controlled by:
+    - `--threshold_objective` (default: `recall_at_precision`)
+    - `--threshold_min_precision` (default: `0.20`)
 
-**Parameters:**
-- `--val_size`: Validation split ratio (e.g., 0.15 = 15%)
-- `--test_size`: Test hold-out ratio (e.g., 0.15 = 15%)
-- `--skip_evaluation`: Optional - skip automatic test evaluation
+### 5. Progress logs for long scoring phases
+- Long-running checkpoint scoring and threshold calibration now print progress.
+- This avoids the "looks stuck" behavior during expensive validation scoring.
 
-### Data Flow Example
+## Recommended Training Command
 
-With 8,048 German samples:
-```
-Original Data (8,048 samples)
-    ↓
-[Test Hold-out: 15%]
-    ├─→ Test Set: 1,207 samples (held out)
-    └─→ Train+Val: 6,841 samples
-            ↓
-        [Val Split: 15%]
-            ├─→ Validation: 1,026 samples
-            └─→ Training: 5,815 samples
-```
-
-After training → Automatic evaluation on 1,207 held-out test samples
-
-### Manual Evaluation
-
-For later manual evaluation:
+Use PowerShell and run as one command line:
 
 ```bash
-python -m src.evaluate \
-    --checkpoint checkpoints/xlmr-nli/de_ft \
-    --test_data data/de_cleaned.csv \
-    --lang de
+C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --en_train data/en_cleaned.csv --de_train data/de_cleaned.csv --threshold_objective recall_at_precision --threshold_min_precision 0.20 --model_selection_objective recall_at_precision --model_selection_min_precision 0.20
 ```
 
-## Pipeline Benefits
+If you want to skip final test evaluation during experiments:
 
-✅ **No Data Leakage**: Test set never used for training  
-✅ **Automated**: Everything in one run  
-✅ **Reproducible**: Fixed seeds for consistent splits  
-✅ **Transparent**: Clear output about data sizes  
-
-## Latest Results (February 2026)
-
-Training completed successfully with the following performance on held-out test sets:
-
-| Model | Test Samples | Accuracy | F1-Score | Loss | Runtime |
-|-------|--------------|----------|----------|------|---------|
-| **English (Stage 1)** | 3,394 NLI | **90.45%** | **90.45%** | 0.2976 | 5.17s |
-| **German (Stage 2)** | 2,415 NLI | **97.60%** | **97.60%** | 0.1120 | 4.13s |
-
-**Training Duration:**
-- Stage 1 (English): ~7.8 minutes (469s)
-- Stage 2 (German): ~6.2 minutes (372s)
-- **Total**: ~14 minutes
-
-**Key Findings:**
-- German fine-tuning shows **7.15 percentage points better performance** than the English base model
-- Excellent generalization on unseen data
-- No data leakage - test sets were completely held out from training
-- The German model achieves 97.60% accuracy for antisemitism detection
-
-## Sample Output
-
-```
-================================================================================
-STAGE 1: ENGLISH TRAINING
-================================================================================
-
-================================================================================
-Holding out 15% of data as test set (NOT used for training)
-================================================================================
-Test set: 3394 NLI samples (held out for final evaluation)
-Splitting remaining 19228 NLI samples into train/val (82%/18%)
-Train set: 15834 NLI samples
-Validation set: 3394 NLI samples
-
-[Training in progress...]
-
-================================================================================
-STAGE 2: GERMAN FINE-TUNING
-================================================================================
-
-================================================================================
-Holding out 15% of data as test set (NOT used for training)
-================================================================================
-Test set: 2415 NLI samples (held out for final evaluation)
-Splitting remaining 13681 NLI samples into train/val (82%/18%)
-Train set: 11266 NLI samples
-Validation set: 2415 NLI samples
-
-[Training in progress...]
-
-================================================================================
-FINAL EVALUATION ON HELD-OUT TEST SETS
-================================================================================
-
---------------------------------------------------------------------------------
-Evaluating German model on held-out test set...
---------------------------------------------------------------------------------
-Loading checkpoint from: checkpoints/xlmr-nli/de_ft
-Language: de
-Test samples: 2415
---------------------------------------------------------------------------------
-Running evaluation...
-
-================================================================================
-EVALUATION RESULTS
-================================================================================
-Accuracy:  0.9760 (97.60%)
-F1-Score:  0.9760 (97.60%)
-Loss:      0.1120
-Runtime:   4.13s
-Samples/s: 584.19
-================================================================================
-
-================================================================================
-TRAINING COMPLETE
-================================================================================
+```bash
+C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --en_train data/en_cleaned.csv --de_train data/de_cleaned.csv --skip_evaluation
 ```
 
-## Model Checkpoints
+## Full CLI Options (Current)
 
-Trained models are saved in:
-- English model: `checkpoints/xlmr-nli/`
-- German model: `checkpoints/xlmr-nli/de_ft/`
+- `--en_train` (required): path to English training CSV
+- `--de_train` (required): path to German training CSV
+- `--en_val` (optional): English validation CSV (ignored when `--val_size` is used)
+- `--de_val` (optional): German validation CSV (ignored when `--val_size` is used)
+- `--model_name` (default: `xlm-roberta-base`)
+- `--val_size` (default: `0.15`)
+- `--test_size` (default: `0.15`)
+- `--pos_oversample_factor` (default: `5.0`)
+- `--positive_sample_weight` (default: `5.0`)
+- `--threshold_objective` (`f1|recall|recall_at_precision`, default: `recall_at_precision`)
+- `--threshold_min_precision` (default: `0.20`)
+- `--model_selection_objective` (`f1|recall|recall_at_precision`, default: `recall_at_precision`)
+- `--model_selection_min_precision` (default: `0.20`)
+- `--skip_evaluation` (flag)
+- `--show_examples` (default: `10`)
 
-These checkpoints can be used for inference or further evaluation.
+## Evaluation
+
+Manual detailed evaluation:
+
+```bash
+C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.evaluate --checkpoint checkpoints/xlmr-nli/de_ft --test_data data/de_cleaned_test_holdout.csv --lang de --show_examples 10
+```
+
+Key tweet-level metrics to watch:
+- `Positive Recall`: how many antisemitic tweets are found
+- `Positive Precision`: false-positive control
+- `Positive F1`: balance between precision and recall
+- Confusion matrix (`TP/FP/FN/TN`)
+
+## Notes on Metric Interpretation
+
+- High accuracy can be misleading on highly imbalanced datasets.
+- For deployment goals like "catch as many antisemitic tweets as possible", prioritize positive-class recall under a minimum precision constraint.
+- NLI pair-level metrics alone are not sufficient; use tweet-level metrics for model selection and decision threshold tuning.
+
+## Output Locations
+
+- Stage 1 checkpoint: `checkpoints/xlmr-nli/`
+- Stage 2 checkpoint: `checkpoints/xlmr-nli/de_ft/`
+- Threshold config per stage: `decision_config.json` inside the checkpoint directory
+
+## Troubleshooting
+
+- If training appears frozen:
+    - Wait for progress prints during validation scoring.
+    - Verify you are running in PowerShell (not inside an interactive Python REPL).
+    - Ensure the command is not accidentally concatenated with another command.
+- If you need to inspect available flags quickly:
+
+```bash
+C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --help
+```

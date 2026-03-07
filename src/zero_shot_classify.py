@@ -3,6 +3,7 @@ import pandas as pd
 from typing import List, Dict
 from tqdm import tqdm
 from .infer import load_nli_model, predict_label_with
+from .decision import load_decision_threshold
 
 
 def zero_shot_classify_csv(input_csv: str, output_csv: str, ckpt_dir: str, lang: str = "de"):
@@ -32,6 +33,8 @@ def zero_shot_classify_csv(input_csv: str, output_csv: str, ckpt_dir: str, lang:
     
     # Load model once
     tok, mdl, device = load_nli_model(ckpt_dir)
+    threshold = load_decision_threshold(ckpt_dir)
+    print(f"Decision threshold (margin score_1-score_0): {threshold:.4f}")
     
     predictions: List[str] = []
     scores_list: List[Dict[str, float]] = []
@@ -39,7 +42,14 @@ def zero_shot_classify_csv(input_csv: str, output_csv: str, ckpt_dir: str, lang:
     # Classify each text
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Zero-shot classifying"):
         text = str(row["Text"])
-        pred, scores = predict_label_with(text=text, lang=lang, tok=tok, mdl=mdl, device=device)
+        pred, scores = predict_label_with(
+            text=text,
+            lang=lang,
+            tok=tok,
+            mdl=mdl,
+            device=device,
+            positive_margin_threshold=threshold,
+        )
         predictions.append(pred)
         scores_list.append(scores)
     
