@@ -10,6 +10,7 @@ from .hypotheses import HYPOTHESES, NLI_LABEL2ID, hypotheses_for_class
 
 DECISION_CONFIG_FILENAME = "decision_config.json"
 DEFAULT_POSITIVE_MARGIN_THRESHOLD = 0.0
+DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K = 2
 
 
 def _to_device(inputs: Dict[str, torch.Tensor], device: torch.device) -> Dict[str, torch.Tensor]:
@@ -29,7 +30,15 @@ def score_text(text: str, lang: str, tokenizer, model, device: torch.device) -> 
             logits = model(**inputs).logits[0]
             probs = logits.softmax(-1).detach().cpu().numpy()
             entail_scores.append(float(probs[entail_id]))
-        scores[cls] = max(entail_scores) if entail_scores else 0.0
+
+        if not entail_scores:
+            scores[cls] = 0.0
+            continue
+
+        top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(entail_scores))
+        # Use top-k mean instead of max to reduce one-hypothesis spikes.
+        top_scores = sorted(entail_scores, reverse=True)[:top_k]
+        scores[cls] = float(sum(top_scores) / len(top_scores))
     return scores
 
 

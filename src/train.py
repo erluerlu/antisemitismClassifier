@@ -41,8 +41,14 @@ class Config:
     seed: int = 42
     pos_oversample_factor: float = 5.0
     positive_sample_weight: float = 5.0
+    en_pos_oversample_factor: float = 1.5
+    de_pos_oversample_factor: float = 2.0
+    en_positive_sample_weight: float = 3.0
+    de_positive_sample_weight: float = 10.0
     threshold_objective: str = "recall"
     threshold_min_precision: float = 0.20
+    threshold_search_min: float = -0.5
+    threshold_search_max: float = 0.5
     model_selection_objective: str = "recall_at_precision"
     model_selection_min_precision: float = 0.20
     model_selection_last_k_checkpoints: int = 3
@@ -130,11 +136,15 @@ def compute_metrics(eval_pred):
 
     acc_res = metric_acc.compute(predictions=preds_list, references=labels_list)
     f1_macro = metric_f1.compute(predictions=preds_list, references=labels_list, average="macro")
-    f1_entail = metric_f1.compute(predictions=preds_list, references=labels_list, average="binary", pos_label=NLI_LABEL2ID["entailment"])
+    # Robust against 3-class predictions (e.g., neutral): compute entailment as one-vs-rest.
+    entailment_id = NLI_LABEL2ID["entailment"]
+    y_true_entail = [1 if y == entailment_id else 0 for y in labels_list]
+    y_pred_entail = [1 if y == entailment_id else 0 for y in preds_list]
+    f1_entail = f1_score(y_true_entail, y_pred_entail, zero_division=0)
 
     out = {k: float(v) for k, v in acc_res.items()}
     out["f1"] = float(f1_macro["f1"])
-    out["f1_entailment"] = float(f1_entail["f1"])
+    out["f1_entailment"] = float(f1_entail)
     return out
 
 
@@ -268,9 +278,18 @@ def train_stage(
         seed=cfg.seed,
     )
 
-    if cfg.pos_oversample_factor > 1.0:
-        train_df = oversample_positive_rows(train_df, factor=cfg.pos_oversample_factor, seed=cfg.seed)
-        print(f"Applied positive oversampling factor: {cfg.pos_oversample_factor:.2f}")
+    if lang == "en":
+        oversample_factor = float(cfg.en_pos_oversample_factor)
+        positive_sample_weight = float(cfg.en_positive_sample_weight)
+    else:
+        oversample_factor = float(cfg.de_pos_oversample_factor)
+        positive_sample_weight = float(cfg.de_positive_sample_weight)
+
+    if oversample_factor > 1.0:
+        train_df = oversample_positive_rows(train_df, factor=oversample_factor, seed=cfg.seed)
+        print(f"Applied positive oversampling factor: {oversample_factor:.2f}")
+
+    print(f"Positive sample loss weight: {positive_sample_weight:.2f}")
 
     print("\nTweet-level split summary")
     _print_class_distribution("Train", train_df)
@@ -314,11 +333,11 @@ def train_stage(
         loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
         sample_losses = loss_fct(logits.view(-1, num_labels), labels.view(-1))
 
-        if target_cls is not None and cfg.positive_sample_weight != 1.0:
+        if target_cls is not None and positive_sample_weight != 1.0:
             cls_tensor = target_cls.view(-1).to(sample_losses.device)
             sample_weights = torch.where(
                 cls_tensor == 1,
-                torch.full_like(sample_losses, float(cfg.positive_sample_weight)),
+                torch.full_like(sample_losses, positive_sample_weight),
                 torch.ones_like(sample_losses),
             )
             loss = (sample_losses * sample_weights).mean()
@@ -339,11 +358,12 @@ def train_stage(
         eval_strategy="steps" if val_ds else "no",
         save_strategy="steps" if val_ds else "no",
         logging_steps=100,
-        save_steps=500,
-        eval_steps=100,
+        save_steps=200,
+        eval_steps=200,
         load_best_model_at_end=True if val_ds else False,
         metric_for_best_model="eval_loss",
         greater_is_better=False,
+        save_total_limit=5,  # Keep last 5 checkpoints for model-selection flexibility
         seed=cfg.seed,
         report_to=[],
     )
@@ -454,6 +474,8 @@ def train_stage(
             model=trainer.model,
             device=trainer.model.device,
             objective=cfg.threshold_objective,
+            threshold_min=cfg.threshold_search_min,
+            threshold_max=cfg.threshold_search_max,
             min_precision=cfg.threshold_min_precision,
             progress_label="Threshold calibration scoring",
         )
@@ -491,7 +513,7 @@ if __name__ == "__main__":
     from .evaluate import evaluate_with_analysis
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--en_train", required=True, help="Path to English training CSV")
+    parser.add_argument("--en_train", required=False, default="", help="Path to English training CSV")
     parser.add_argument(
         "--en_val",
         required=False,
@@ -531,6 +553,30 @@ if __name__ == "__main__":
         help="Loss weight multiplier for NLI rows originating from positive tweets.",
     )
     parser.add_argument(
+        "--en_pos_oversample_factor",
+        type=float,
+        default=1.5,
+        help="Oversampling factor for positive tweets in EN training split.",
+    )
+    parser.add_argument(
+        "--de_pos_oversample_factor",
+        type=float,
+        default=2.0,
+        help="Oversampling factor for positive tweets in DE training split.",
+    )
+    parser.add_argument(
+        "--en_positive_sample_weight",
+        type=float,
+        default=3.0,
+        help="Loss weight multiplier for positive tweets in EN stage.",
+    )
+    parser.add_argument(
+        "--de_positive_sample_weight",
+        type=float,
+        default=10.0,
+        help="Loss weight multiplier for positive tweets in DE stage.",
+    )
+    parser.add_argument(
         "--threshold_objective",
         type=str,
         default="recall_at_precision",
@@ -542,6 +588,18 @@ if __name__ == "__main__":
         type=float,
         default=0.20,
         help="Minimum precision constraint for threshold objective recall_at_precision.",
+    )
+    parser.add_argument(
+        "--threshold_search_min",
+        type=float,
+        default=-0.5,
+        help="Lower bound for threshold calibration search range.",
+    )
+    parser.add_argument(
+        "--threshold_search_max",
+        type=float,
+        default=0.5,
+        help="Upper bound for threshold calibration search range.",
     )
     parser.add_argument(
         "--model_selection_objective",
@@ -569,62 +627,108 @@ if __name__ == "__main__":
         default=10,
         help="Number of error examples to show in evaluation (default: 10)",
     )
+    parser.add_argument(
+        "--de_only",
+        action="store_true",
+        help="Train only on German data (no English pretraining stage).",
+    )
+    parser.add_argument(
+        "--de_only_output_dir",
+        type=str,
+        default=os.path.join("checkpoints", "xlmr-nli", "de_only"),
+        help="Output directory used when --de_only is enabled.",
+    )
     args_ = parser.parse_args()
+
+    if not args_.de_train:
+        parser.error("--de_train is required")
+    if not args_.de_only and not args_.en_train:
+        parser.error("--en_train is required unless --de_only is set")
 
     cfg = Config(
         model_name=args_.model_name,
         pos_oversample_factor=args_.pos_oversample_factor,
         positive_sample_weight=args_.positive_sample_weight,
+        en_pos_oversample_factor=args_.en_pos_oversample_factor,
+        de_pos_oversample_factor=args_.de_pos_oversample_factor,
+        en_positive_sample_weight=args_.en_positive_sample_weight,
+        de_positive_sample_weight=args_.de_positive_sample_weight,
         threshold_objective=args_.threshold_objective,
         threshold_min_precision=args_.threshold_min_precision,
+        threshold_search_min=args_.threshold_search_min,
+        threshold_search_max=args_.threshold_search_max,
         model_selection_objective=args_.model_selection_objective,
         model_selection_min_precision=args_.model_selection_min_precision,
         model_selection_last_k_checkpoints=args_.model_selection_last_k_checkpoints,
     )
 
-    print("\n" + "=" * 80)
-    print("STAGE 1: ENGLISH TRAINING")
-    print("=" * 80)
-    en_out, en_test_csv, en_lang = train_stage(
-        args_.en_train,
-        args_.en_val,
-        "en",
-        cfg,
-        resume_from=None,
-        val_size=args_.val_size,
-        hold_test_size=args_.test_size,
-    )
-
-    print("\n" + "=" * 80)
-    print("STAGE 2: GERMAN FINE-TUNING")
-    print("=" * 80)
-    cfg.output_dir = os.path.join(cfg.output_dir, "de_ft")
-    de_out, de_test_csv, de_lang = train_stage(
-        args_.de_train,
-        args_.de_val,
-        "de",
-        cfg,
-        resume_from=en_out,
-        val_size=args_.val_size,
-        hold_test_size=args_.test_size,
-    )
-
-    if not args_.skip_evaluation:
+    if args_.de_only:
         print("\n" + "=" * 80)
-        print("FINAL EVALUATION ON HELD-OUT TEST SETS")
+        print("GERMAN TRAINING (DE-ONLY, NO ENGLISH PRETRAINING)")
         print("=" * 80)
+        cfg.output_dir = args_.de_only_output_dir
+        de_out, de_test_csv, de_lang = train_stage(
+            args_.de_train,
+            args_.de_val,
+            "de",
+            cfg,
+            resume_from=None,
+            val_size=args_.val_size,
+            hold_test_size=args_.test_size,
+        )
 
-        if en_test_csv is not None:
-            print("\n" + "-" * 80)
-            print("Evaluating English model on held-out test set...")
-            print("-" * 80)
-            evaluate_with_analysis(en_out, en_test_csv, en_lang, show_examples=args_.show_examples)
-
-        if de_test_csv is not None:
+        if not args_.skip_evaluation and de_test_csv is not None:
+            print("\n" + "=" * 80)
+            print("FINAL EVALUATION ON HELD-OUT TEST SET")
+            print("=" * 80)
             print("\n" + "-" * 80)
             print("Evaluating German model on held-out test set...")
             print("-" * 80)
             evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples)
+    else:
+        print("\n" + "=" * 80)
+        print("STAGE 1: ENGLISH TRAINING")
+        print("=" * 80)
+        en_out, en_test_csv, en_lang = train_stage(
+            args_.en_train,
+            args_.en_val,
+            "en",
+            cfg,
+            resume_from=None,
+            val_size=args_.val_size,
+            hold_test_size=args_.test_size,
+        )
+
+        print("\n" + "=" * 80)
+        print("STAGE 2: GERMAN FINE-TUNING")
+        print("=" * 80)
+        cfg.output_dir = os.path.join(cfg.output_dir, "de_ft")
+        de_out, de_test_csv, de_lang = train_stage(
+            args_.de_train,
+            args_.de_val,
+            "de",
+            cfg,
+            resume_from=en_out,
+            val_size=args_.val_size,
+            hold_test_size=args_.test_size,
+        )
+
+        if not args_.skip_evaluation:
+            print("\n" + "=" * 80)
+            print("FINAL EVALUATION ON HELD-OUT TEST SETS")
+            print("=" * 80)
+
+            if en_test_csv is not None:
+                print("\n" + "-" * 80)
+                print("Evaluating English model on held-out test set...")
+                print("-" * 80)
+                evaluate_with_analysis(en_out, en_test_csv, en_lang, show_examples=args_.show_examples)
+
+            if de_test_csv is not None:
+                print("\n" + "-" * 80)
+                print("Evaluating German model on held-out test set...")
+                print("-" * 80)
+                evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples)
 
     print("\n" + "=" * 80)
     print("TRAINING COMPLETE")
