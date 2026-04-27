@@ -240,6 +240,7 @@ def evaluate_checkpoint(checkpoint_path: str, test_csv: str, lang: str):
 
 
 def main():
+    """Parse evaluation CLI arguments and run detailed checkpoint evaluation."""
     parser = argparse.ArgumentParser(description="Evaluate a trained checkpoint with detailed analysis")
     parser.add_argument("--checkpoint", type=str, default="checkpoints/xlmr-nli/de_ft", help="Path to checkpoint directory")
     parser.add_argument("--test_data", type=str, default="data/de_cleaned.csv", help="Path to test CSV file")

@@ -42,19 +42,20 @@ class Config:
     pos_oversample_factor: float = 5.0
     positive_sample_weight: float = 5.0
     en_pos_oversample_factor: float = 1.5
-    de_pos_oversample_factor: float = 2.0
+    de_pos_oversample_factor: float = 1.5
     en_positive_sample_weight: float = 3.0
-    de_positive_sample_weight: float = 10.0
-    threshold_objective: str = "recall"
-    threshold_min_precision: float = 0.20
-    threshold_search_min: float = -0.5
-    threshold_search_max: float = 0.5
+    de_positive_sample_weight: float = 7.0
+    threshold_objective: str = "recall_at_precision"
+    threshold_min_precision: float = 0.40
+    threshold_search_min: float = -1.0
+    threshold_search_max: float = 1.0
     model_selection_objective: str = "recall_at_precision"
-    model_selection_min_precision: float = 0.20
+    model_selection_min_precision: float = 0.40
     model_selection_last_k_checkpoints: int = 3
 
 
 def _print_class_distribution(name: str, df: pd.DataFrame):
+    """Print sample count and binary class distribution for a dataframe split."""
     dist = df["Biased"].value_counts().sort_index().to_dict()
     print(f"{name}: {len(df)} samples | class dist: {dist}")
 
@@ -191,6 +192,36 @@ def _list_candidate_checkpoint_dirs(output_dir: str) -> list[str]:
     return candidates
 
 
+def _checkpoint_last_write_time(checkpoint_dir: str) -> float:
+    """Return latest relevant file mtime from a checkpoint directory (fallback: directory mtime)."""
+    priority_files = [
+        "model.safetensors",
+        "pytorch_model.bin",
+        "trainer_state.json",
+        "config.json",
+        "optimizer.pt",
+        "scheduler.pt",
+        "rng_state.pth",
+    ]
+
+    mtimes: list[float] = []
+    for filename in priority_files:
+        file_path = os.path.join(checkpoint_dir, filename)
+        if os.path.isfile(file_path):
+            try:
+                mtimes.append(os.path.getmtime(file_path))
+            except OSError:
+                pass
+
+    if mtimes:
+        return max(mtimes)
+
+    try:
+        return os.path.getmtime(checkpoint_dir)
+    except OSError:
+        return 0.0
+
+
 def _select_best_checkpoint_by_tweet_objective(
     output_dir: str,
     val_texts: list[str],
@@ -320,6 +351,7 @@ def train_stage(
 
     # Weighted loss at tweet-level: rows from positive tweets get more weight.
     def compute_loss(model, inputs, return_outputs=False, num_items_in_batch=None):
+        """Compute cross-entropy loss with optional upweighting for positive tweets."""
         labels = inputs.pop("labels", None)
         target_cls = inputs.pop("target_cls", None)
         _ = inputs.pop("hyp_cls", None)
@@ -361,8 +393,8 @@ def train_stage(
         save_steps=200,
         eval_steps=200,
         load_best_model_at_end=True if val_ds else False,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
+        metric_for_best_model="eval_f1_entailment",
+        greater_is_better=True,
         save_total_limit=5,  # Keep last 5 checkpoints for model-selection flexibility
         seed=cfg.seed,
         report_to=[],
@@ -380,7 +412,7 @@ def train_stage(
     trainer.compute_loss = compute_loss
 
     if val_ds:
-        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=3))
+        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=5))
 
     # Keep run start timestamp so we can detect checkpoints written/updated by this run.
     run_start_ts = time.time()
@@ -400,12 +432,9 @@ def train_stage(
                 if not (os.path.isdir(path) and name.startswith("checkpoint-")):
                     continue
 
-                # Treat checkpoint dirs as part of this run when they were modified after run start.
-                # This correctly includes overwritten folders like checkpoint-500 from repeated runs.
-                try:
-                    mtime = os.path.getmtime(path)
-                except OSError:
-                    continue
+                # Use checkpoint file mtimes (not only directory mtime) to detect writes in this run.
+                # This is more robust on Windows when existing checkpoint-* directories are reused.
+                mtime = _checkpoint_last_write_time(path)
                 if mtime >= run_start_ts - 1.0:
                     current_checkpoints.append(path)
         current_checkpoints.sort(key=lambda p: int(os.path.basename(p).split("-")[-1]))
@@ -561,7 +590,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--de_pos_oversample_factor",
         type=float,
-        default=2.0,
+        default=1.5,
         help="Oversampling factor for positive tweets in DE training split.",
     )
     parser.add_argument(
@@ -573,7 +602,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--de_positive_sample_weight",
         type=float,
-        default=10.0,
+        default=7.0,
         help="Loss weight multiplier for positive tweets in DE stage.",
     )
     parser.add_argument(
@@ -586,19 +615,19 @@ if __name__ == "__main__":
     parser.add_argument(
         "--threshold_min_precision",
         type=float,
-        default=0.20,
+        default=0.40,
         help="Minimum precision constraint for threshold objective recall_at_precision.",
     )
     parser.add_argument(
         "--threshold_search_min",
         type=float,
-        default=-0.5,
+        default=-1.0,
         help="Lower bound for threshold calibration search range.",
     )
     parser.add_argument(
         "--threshold_search_max",
         type=float,
-        default=0.5,
+        default=1.0,
         help="Upper bound for threshold calibration search range.",
     )
     parser.add_argument(
@@ -611,7 +640,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_selection_min_precision",
         type=float,
-        default=0.20,
+        default=0.40,
         help="Minimum precision constraint for model selection objective recall_at_precision.",
     )
     parser.add_argument(

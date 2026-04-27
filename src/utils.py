@@ -2,13 +2,11 @@ from pydoc import text
 import re
 import emoji
 import pandas as pd
-from stopwords import get_stopwords
-
 
 def _normalize_text(value):
+    """Normalize raw text by removing links, mentions, HTML entities, and extra whitespace."""
     text = str(value)
     text = re.sub(r'http\S+|www\S+|https\S+', '', text)
-    text = emoji.replace_emoji(text, replace='')
     text = re.sub(r'@\w+', '', text)
     text = re.sub(r'&\w+;', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
@@ -33,7 +31,6 @@ def clean_text_advanced(csv_path):
         - Rows with missing values in 'Text' or 'Biased' columns are excluded.
         - The following elements are removed from text:
             * URLs (http, https, www)
-            * Emojis
             * Mentions (@username)
             * HTML entities (&entity;)
             * Multiple consecutive whitespaces
@@ -59,6 +56,7 @@ def clean_text_hard(csv_path):
     df = df.dropna(subset=["Text", "Biased"])
 
     def is_clean(text):
+        """Return True when a tweet does not contain URLs or @mentions."""
         if re.search(r'http\S+|www\S+|https\S+', text):
             return False
         if re.search(r'@\w+', text):
@@ -136,14 +134,15 @@ def frequencyAnalysis(csv_files=None, top_n=20, language='all', exclude_stopword
 
 
 def main():
+    """Run default text-cleaning routines for German and English source CSV files."""
     # Text cleaning
     #csv_path = "data/de.csv"
     #clean_text_advanced(csv_path)
     
     # Word frequency analysis
     #frequencyAnalysis(top_n=25)
-    clean_text_hard("data/de.csv")
-    clean_text_hard("data/en.csv")
+    clean_text_advanced("data/de.csv")
+    clean_text_advanced("data/en.csv")
 
 if __name__ == "__main__":
     main()

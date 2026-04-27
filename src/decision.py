@@ -14,6 +14,7 @@ DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K = 2
 
 
 def _to_device(inputs: Dict[str, torch.Tensor], device: torch.device) -> Dict[str, torch.Tensor]:
+    """Move tokenized model inputs to the target torch device."""
     return {k: v.to(device) for k, v in inputs.items()}
 
 
@@ -167,6 +168,7 @@ def tune_positive_margin_threshold(
 
 
 def decision_config_path(ckpt_dir: str) -> str:
+    """Return the full path to the decision-threshold config file for a checkpoint."""
     return os.path.join(ckpt_dir, DECISION_CONFIG_FILENAME)
 
 

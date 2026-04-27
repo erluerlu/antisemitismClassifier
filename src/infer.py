@@ -29,6 +29,7 @@ class ClassificationResult(TypedDict):
 
 
 def _resolve_device(device: str | torch.device | None = None) -> torch.device:
+    """Resolve a torch device from user input or pick CUDA/CPU automatically."""
     if device is None:
         return torch.device("cuda" if torch.cuda.is_available() else "cpu")
     return torch.device(device)
@@ -144,6 +145,7 @@ def classify_text(
 
 
 def main():
+    """Parse CLI arguments and print a human-readable prediction for one text."""
     parser = argparse.ArgumentParser(description="Classify one text with a trained antisemitism NLI model")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to trained checkpoint directory")
     parser.add_argument("--lang", type=str, required=True, choices=["en", "de"], help="Input text language")
