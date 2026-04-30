@@ -4,7 +4,7 @@ from typing import TypedDict
 import torch
 from transformers import AutoModelForSequenceClassification
 
-from .decision import load_decision_threshold, predict_from_scores, score_text
+from .decision import load_decision_params, predict_from_scores, score_text
 from .tokenizer_utils import load_tokenizer
 
 
@@ -26,6 +26,7 @@ class ClassificationResult(TypedDict):
     scores: dict[str, float]
     margin: float
     threshold: float
+    contradiction_weight: float
 
 
 def _resolve_device(device: str | torch.device | None = None) -> torch.device:
@@ -53,11 +54,19 @@ def predict_label_with(
     mdl,
     device: str | torch.device | None = None,
     positive_margin_threshold: float = 0.0,
+    contradiction_weight: float = 1.0,
 ):
     """Predicts one label from a preloaded model using thresholded NLI margin."""
     resolved_device = _resolve_device(device)
     mdl.eval()
-    scores = score_text(text=text, lang=lang, tokenizer=tok, model=mdl, device=resolved_device)
+    scores = score_text(
+        text=text,
+        lang=lang,
+        tokenizer=tok,
+        model=mdl,
+        device=resolved_device,
+        contradiction_weight=contradiction_weight,
+    )
     pred = predict_from_scores(scores, positive_margin_threshold=positive_margin_threshold)
     return pred, scores
 
@@ -68,15 +77,20 @@ def predict_label(
     lang: str,
     ckpt_dir: str,
     positive_margin_threshold: float | None = None,
+    contradiction_weight: float | None = None,
 ):
     """
     One-shot prediction API.
 
-    If threshold is None, uses checkpoint decision_config.json when available.
+    If score params are None, uses checkpoint decision_config.json when available.
     """
     tok, mdl, device = load_nli_model(ckpt_dir)
+    cfg_threshold, cfg_contradiction_weight = load_decision_params(ckpt_dir)
     threshold = (
-        load_decision_threshold(ckpt_dir) if positive_margin_threshold is None else float(positive_margin_threshold)
+        cfg_threshold if positive_margin_threshold is None else float(positive_margin_threshold)
+    )
+    contradiction_weight_used = (
+        cfg_contradiction_weight if contradiction_weight is None else float(contradiction_weight)
     )
     pred, scores = predict_label_with(
         text=text,
@@ -85,6 +99,7 @@ def predict_label(
         mdl=mdl,
         device=device,
         positive_margin_threshold=threshold,
+        contradiction_weight=contradiction_weight_used,
     )
     return pred, scores
 
@@ -108,6 +123,7 @@ def classify_text(
     lang: str,
     ckpt_dir: str,
     positive_margin_threshold: float | None = None,
+    contradiction_weight: float | None = None,
 ) -> ClassificationResult:
     """
     Classifies one raw text as antisemitic (1) or non-antisemitic (0).
@@ -115,8 +131,12 @@ def classify_text(
     Returns label, class probabilities, raw class entailment scores and margin.
     """
     tok, mdl, device = load_nli_model(ckpt_dir)
+    cfg_threshold, cfg_contradiction_weight = load_decision_params(ckpt_dir)
     threshold = (
-        load_decision_threshold(ckpt_dir) if positive_margin_threshold is None else float(positive_margin_threshold)
+        cfg_threshold if positive_margin_threshold is None else float(positive_margin_threshold)
+    )
+    contradiction_weight_used = (
+        cfg_contradiction_weight if contradiction_weight is None else float(contradiction_weight)
     )
 
     pred, scores = predict_label_with(
@@ -126,6 +146,7 @@ def classify_text(
         mdl=mdl,
         device=device,
         positive_margin_threshold=threshold,
+        contradiction_weight=contradiction_weight_used,
     )
 
     prob_0, prob_1 = _binary_class_probabilities_from_scores(scores)
@@ -141,6 +162,7 @@ def classify_text(
         "scores": {"0": float(scores.get("0", 0.0)), "1": float(scores.get("1", 0.0))},
         "margin": margin,
         "threshold": float(threshold),
+        "contradiction_weight": float(contradiction_weight_used),
     }
 
 
@@ -156,6 +178,12 @@ def main():
         default=None,
         help="Optional override for positive margin threshold (score_1-score_0)",
     )
+    parser.add_argument(
+        "--contradiction_weight",
+        type=float,
+        default=None,
+        help="Optional override for hypothesis scoring: entailment - weight * contradiction.",
+    )
     args = parser.parse_args()
 
     out = classify_text(
@@ -163,6 +191,7 @@ def main():
         lang=args.lang,
         ckpt_dir=args.checkpoint,
         positive_margin_threshold=args.threshold,
+        contradiction_weight=args.contradiction_weight,
     )
 
     print("Prediction:", out["label_name"], f"({out['label_int']})")
@@ -173,6 +202,7 @@ def main():
     )
     print(f"Score margin (1-0): {out['margin']:.4f}")
     print(f"Decision threshold: {out['threshold']:.4f}")
+    print(f"Contradiction weight: {out['contradiction_weight']:.4f}")
 
 
 if __name__ == "__main__":

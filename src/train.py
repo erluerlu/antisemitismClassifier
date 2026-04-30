@@ -1,5 +1,6 @@
 import os
 import time
+from tkinter import NONE
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from .dataset import load_binary_dataframe, dataframe_to_nli_dataset, oversample
 from .hypotheses import NLI_LABEL2ID
 from .tokenizer_utils import load_tokenizer
 from .decision import (
+    DEFAULT_CONTRADICTION_WEIGHT,
     DEFAULT_POSITIVE_MARGIN_THRESHOLD,
     predict_texts_with_threshold,
     save_decision_config,
@@ -39,18 +41,19 @@ class Config:
     weight_decay: float = 0.01
     warmup_ratio: float = 0.06
     seed: int = 42
-    pos_oversample_factor: float = 5.0
-    positive_sample_weight: float = 5.0
-    en_pos_oversample_factor: float = 1.5
-    de_pos_oversample_factor: float = 1.5
-    en_positive_sample_weight: float = 3.0
-    de_positive_sample_weight: float = 7.0
+    pos_oversample_factor: float = 3.0
+    positive_sample_weight: float = 1.0
+    en_pos_oversample_factor: float = 3.0
+    de_pos_oversample_factor: float = 6.0
+    en_positive_sample_weight: float = 1.0
+    de_positive_sample_weight: float = 3.0
     threshold_objective: str = "recall_at_precision"
-    threshold_min_precision: float = 0.40
-    threshold_search_min: float = -1.0
-    threshold_search_max: float = 1.0
+    threshold_min_precision: float = 0.5
+    threshold_search_min: float = -0.5
+    threshold_search_max: float = 0.5
+    contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT
     model_selection_objective: str = "recall_at_precision"
-    model_selection_min_precision: float = 0.40
+    model_selection_min_precision: float = 0.45
     model_selection_last_k_checkpoints: int = 3
 
 
@@ -141,10 +144,12 @@ def compute_metrics(eval_pred):
     entailment_id = NLI_LABEL2ID["entailment"]
     y_true_entail = [1 if y == entailment_id else 0 for y in labels_list]
     y_pred_entail = [1 if y == entailment_id else 0 for y in preds_list]
+    recall_entail = recall_score(y_true_entail, y_pred_entail, zero_division=0)
     f1_entail = f1_score(y_true_entail, y_pred_entail, zero_division=0)
 
     out = {k: float(v) for k, v in acc_res.items()}
     out["f1"] = float(f1_macro["f1"])
+    out["recall_entailment"] = float(recall_entail)
     out["f1_entailment"] = float(f1_entail)
     return out
 
@@ -261,6 +266,7 @@ def _select_best_checkpoint_by_tweet_objective(
                 model=eval_model,
                 device=device,
                 positive_margin_threshold=DEFAULT_POSITIVE_MARGIN_THRESHOLD,
+                contradiction_weight=cfg.contradiction_weight,
                 progress_label=f"Scoring validation tweets for {os.path.basename(ckpt)}",
             )
             metrics = _tweet_metrics(val_labels, preds)
@@ -393,7 +399,7 @@ def train_stage(
         save_steps=200,
         eval_steps=200,
         load_best_model_at_end=True if val_ds else False,
-        metric_for_best_model="eval_f1_entailment",
+        metric_for_best_model="recall_entailment",
         greater_is_better=True,
         save_total_limit=5,  # Keep last 5 checkpoints for model-selection flexibility
         seed=cfg.seed,
@@ -506,11 +512,13 @@ def train_stage(
             threshold_min=cfg.threshold_search_min,
             threshold_max=cfg.threshold_search_max,
             min_precision=cfg.threshold_min_precision,
+            contradiction_weight=cfg.contradiction_weight,
             progress_label="Threshold calibration scoring",
         )
         cfg_path = save_decision_config(
             ckpt_dir=best_dir,
             positive_margin_threshold=threshold_result["threshold"],
+            contradiction_weight=cfg.contradiction_weight,
             objective=cfg.threshold_objective,
             validation_metrics=threshold_result,
         )
@@ -522,6 +530,7 @@ def train_stage(
             f"p={threshold_result['precision']:.4f} "
             f"r={threshold_result['recall']:.4f} "
             f"f1={threshold_result['f1']:.4f} "
+            f"contradiction_weight={cfg.contradiction_weight:.4f} "
             f"constraint_satisfied={threshold_result.get('constraint_satisfied', True)}"
         )
         print(f"Saved decision config: {cfg_path}")
@@ -529,6 +538,7 @@ def train_stage(
         cfg_path = save_decision_config(
             ckpt_dir=best_dir,
             positive_margin_threshold=DEFAULT_POSITIVE_MARGIN_THRESHOLD,
+            contradiction_weight=cfg.contradiction_weight,
             objective="default",
             validation_metrics={},
         )
@@ -556,7 +566,7 @@ if __name__ == "__main__":
         default="",
         help="Path to German validation CSV (optional if --val_size is used)",
     )
-    parser.add_argument("--model_name", default="xlm-roberta-base")
+    parser.add_argument("--model_name", type=str, default=None)
     parser.add_argument(
         "--val_size",
         type=float,
@@ -572,81 +582,87 @@ if __name__ == "__main__":
     parser.add_argument(
         "--pos_oversample_factor",
         type=float,
-        default=5.0,
+        default=None,
         help="Oversampling factor for positive tweets in training split (1.0 disables oversampling).",
     )
     parser.add_argument(
         "--positive_sample_weight",
         type=float,
-        default=5.0,
+        default=None,
         help="Loss weight multiplier for NLI rows originating from positive tweets.",
     )
     parser.add_argument(
         "--en_pos_oversample_factor",
         type=float,
-        default=1.5,
+        default=None,
         help="Oversampling factor for positive tweets in EN training split.",
     )
     parser.add_argument(
         "--de_pos_oversample_factor",
         type=float,
-        default=1.5,
+        default=None,
         help="Oversampling factor for positive tweets in DE training split.",
     )
     parser.add_argument(
         "--en_positive_sample_weight",
         type=float,
-        default=3.0,
+        default=None,
         help="Loss weight multiplier for positive tweets in EN stage.",
     )
     parser.add_argument(
         "--de_positive_sample_weight",
         type=float,
-        default=7.0,
+        default=None,
         help="Loss weight multiplier for positive tweets in DE stage.",
     )
     parser.add_argument(
         "--threshold_objective",
         type=str,
-        default="recall_at_precision",
+        default=None,
         choices=["f1", "recall", "recall_at_precision"],
         help="Objective for decision-threshold calibration on validation tweets.",
     )
     parser.add_argument(
         "--threshold_min_precision",
         type=float,
-        default=0.40,
+        default=None,
         help="Minimum precision constraint for threshold objective recall_at_precision.",
     )
     parser.add_argument(
         "--threshold_search_min",
         type=float,
-        default=-1.0,
+        default=None,
         help="Lower bound for threshold calibration search range.",
     )
     parser.add_argument(
         "--threshold_search_max",
         type=float,
-        default=1.0,
+        default=None,
         help="Upper bound for threshold calibration search range.",
+    )
+    parser.add_argument(
+        "--contradiction_weight",
+        type=float,
+        default=None,
+        help="Hypothesis score weight for contradiction in score = entailment - weight * contradiction.",
     )
     parser.add_argument(
         "--model_selection_objective",
         type=str,
-        default="recall_at_precision",
+        default=None,
         choices=["f1", "recall", "recall_at_precision"],
         help="Objective to choose best checkpoint using tweet-level validation metrics.",
     )
     parser.add_argument(
         "--model_selection_min_precision",
         type=float,
-        default=0.40,
+        default=None,
         help="Minimum precision constraint for model selection objective recall_at_precision.",
     )
     parser.add_argument(
         "--model_selection_last_k_checkpoints",
         type=int,
-        default=3,
+        default=None,
         help="Only score the latest K checkpoint-* directories from current run (0 disables limit).",
     )
     parser.add_argument("--skip_evaluation", action="store_true", help="Skip automatic evaluation on test set after training")
@@ -674,22 +690,24 @@ if __name__ == "__main__":
     if not args_.de_only and not args_.en_train:
         parser.error("--en_train is required unless --de_only is set")
 
-    cfg = Config(
-        model_name=args_.model_name,
-        pos_oversample_factor=args_.pos_oversample_factor,
-        positive_sample_weight=args_.positive_sample_weight,
-        en_pos_oversample_factor=args_.en_pos_oversample_factor,
-        de_pos_oversample_factor=args_.de_pos_oversample_factor,
-        en_positive_sample_weight=args_.en_positive_sample_weight,
-        de_positive_sample_weight=args_.de_positive_sample_weight,
-        threshold_objective=args_.threshold_objective,
-        threshold_min_precision=args_.threshold_min_precision,
-        threshold_search_min=args_.threshold_search_min,
-        threshold_search_max=args_.threshold_search_max,
-        model_selection_objective=args_.model_selection_objective,
-        model_selection_min_precision=args_.model_selection_min_precision,
-        model_selection_last_k_checkpoints=args_.model_selection_last_k_checkpoints,
-    )
+    cfg_overrides = {
+        "model_name": args_.model_name,
+        "pos_oversample_factor": args_.pos_oversample_factor,
+        "positive_sample_weight": args_.positive_sample_weight,
+        "en_pos_oversample_factor": args_.en_pos_oversample_factor,
+        "de_pos_oversample_factor": args_.de_pos_oversample_factor,
+        "en_positive_sample_weight": args_.en_positive_sample_weight,
+        "de_positive_sample_weight": args_.de_positive_sample_weight,
+        "threshold_objective": args_.threshold_objective,
+        "threshold_min_precision": args_.threshold_min_precision,
+        "threshold_search_min": args_.threshold_search_min,
+        "threshold_search_max": args_.threshold_search_max,
+        "contradiction_weight": args_.contradiction_weight,
+        "model_selection_objective": args_.model_selection_objective,
+        "model_selection_min_precision": args_.model_selection_min_precision,
+        "model_selection_last_k_checkpoints": args_.model_selection_last_k_checkpoints,
+    }
+    cfg = Config(**{k: v for k, v in cfg_overrides.items() if v is not None})
 
     if args_.de_only:
         print("\n" + "=" * 80)

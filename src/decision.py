@@ -11,6 +11,7 @@ from .hypotheses import HYPOTHESES, NLI_LABEL2ID, hypotheses_for_class
 DECISION_CONFIG_FILENAME = "decision_config.json"
 DEFAULT_POSITIVE_MARGIN_THRESHOLD = 0.0
 DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K = 2
+DEFAULT_CONTRADICTION_WEIGHT = 1.0
 
 
 def _to_device(inputs: Dict[str, torch.Tensor], device: torch.device) -> Dict[str, torch.Tensor]:
@@ -19,28 +20,87 @@ def _to_device(inputs: Dict[str, torch.Tensor], device: torch.device) -> Dict[st
 
 
 @torch.no_grad()
-def score_text(text: str, lang: str, tokenizer, model, device: torch.device) -> Dict[str, float]:
-    """Returns entailment probability per hypothesis class for one text."""
+def score_text(
+    text: str,
+    lang: str,
+    tokenizer,
+    model,
+    device: torch.device,
+    contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+) -> Dict[str, float]:
+    """Returns class score per hypothesis class for one text."""
     entail_id = NLI_LABEL2ID["entailment"]
+    contradiction_id = NLI_LABEL2ID["contradiction"]
     scores: Dict[str, float] = {}
     for cls in HYPOTHESES.keys():
-        entail_scores = []
+        class_scores = []
         for hyp in hypotheses_for_class(cls, lang):
             inputs = tokenizer(text, hyp, return_tensors="pt", truncation=True)
             inputs = _to_device(inputs, device)
             logits = model(**inputs).logits[0]
             probs = logits.softmax(-1).detach().cpu().numpy()
-            entail_scores.append(float(probs[entail_id]))
+            entail_prob = float(probs[entail_id])
+            contradiction_prob = float(probs[contradiction_id])
+            class_scores.append(entail_prob - float(contradiction_weight) * contradiction_prob)
 
-        if not entail_scores:
+        if not class_scores:
             scores[cls] = 0.0
             continue
 
-        top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(entail_scores))
+        top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(class_scores))
         # Use top-k mean instead of max to reduce one-hypothesis spikes.
-        top_scores = sorted(entail_scores, reverse=True)[:top_k]
+        top_scores = sorted(class_scores, reverse=True)[:top_k]
         scores[cls] = float(sum(top_scores) / len(top_scores))
     return scores
+
+
+@torch.no_grad()
+def score_text_detailed(
+    text: str,
+    lang: str,
+    tokenizer,
+    model,
+    device: torch.device,
+    contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+) -> tuple[Dict[str, float], Dict[str, list[tuple[str, float]]]]:
+    """
+    Like score_text, but also returns per-hypothesis entailment scores.
+
+    Returns:
+        scores: aggregated class score (top-k mean), same as score_text
+        hyp_scores: {cls: [(hypothesis_text, score), ...]} sorted descending
+    """
+    entail_id = NLI_LABEL2ID["entailment"]
+    contradiction_id = NLI_LABEL2ID["contradiction"]
+    scores: Dict[str, float] = {}
+    hyp_scores: Dict[str, list[tuple[str, float]]] = {}
+
+    for cls in HYPOTHESES.keys():
+        hyps = hypotheses_for_class(cls, lang)
+        class_scores: list[tuple[str, float]] = []
+        for hyp in hyps:
+            inputs = tokenizer(text, hyp, return_tensors="pt", truncation=True)
+            inputs = _to_device(inputs, device)
+            logits = model(**inputs).logits[0]
+            probs = logits.softmax(-1).detach().cpu().numpy()
+            entail_prob = float(probs[entail_id])
+            contradiction_prob = float(probs[contradiction_id])
+            score = entail_prob - float(contradiction_weight) * contradiction_prob
+            class_scores.append((hyp, score))
+
+        if not class_scores:
+            scores[cls] = 0.0
+            hyp_scores[cls] = []
+            continue
+
+        sorted_hyps = sorted(class_scores, key=lambda x: x[1], reverse=True)
+        hyp_scores[cls] = sorted_hyps
+
+        top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(sorted_hyps))
+        top_scores = [s for _, s in sorted_hyps[:top_k]]
+        scores[cls] = float(sum(top_scores) / len(top_scores))
+
+    return scores, hyp_scores
 
 
 def predict_from_scores(scores: Dict[str, float], positive_margin_threshold: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD) -> str:
@@ -61,6 +121,7 @@ def predict_texts_with_threshold(
     model,
     device: torch.device,
     positive_margin_threshold: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD,
+    contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
     progress_label: str | None = None,
     log_every: int = 100,
 ) -> List[int]:
@@ -68,7 +129,7 @@ def predict_texts_with_threshold(
     texts_list = list(texts)
     total = len(texts_list)
     for idx, text in enumerate(texts_list, start=1):
-        scores = score_text(text, lang, tokenizer, model, device)
+        scores = score_text(text, lang, tokenizer, model, device, contradiction_weight=contradiction_weight)
         preds.append(int(predict_from_scores(scores, positive_margin_threshold=positive_margin_threshold)))
         if progress_label and (idx % log_every == 0 or idx == total):
             print(f"{progress_label}: {idx}/{total}")
@@ -88,6 +149,7 @@ def tune_positive_margin_threshold(
     threshold_max: float = 1.0,
     threshold_steps: int = 401,
     min_precision: float = 0.0,
+    contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
     progress_label: str | None = None,
     log_every: int = 100,
 ) -> Dict[str, float]:
@@ -95,7 +157,7 @@ def tune_positive_margin_threshold(
     margins: List[float] = []
     total = len(texts)
     for idx, text in enumerate(texts, start=1):
-        scores = score_text(text, lang, tokenizer, model, device)
+        scores = score_text(text, lang, tokenizer, model, device, contradiction_weight=contradiction_weight)
         margins.append(float(scores.get("1", 0.0) - scores.get("0", 0.0)))
         if progress_label and (idx % log_every == 0 or idx == total):
             print(f"{progress_label}: {idx}/{total}")
@@ -159,11 +221,17 @@ def tune_positive_margin_threshold(
         best = fallback_best
         best["constraint_satisfied"] = False
     else:
-        best["constraint_satisfied"] = True
+        if objective == "recall_at_precision":
+            best["constraint_satisfied"] = True
+        else:
+            # For unconstrained objectives, still expose whether min_precision was met
+            # (useful for debugging accidental threshold collapse).
+            best["constraint_satisfied"] = bool(best["precision"] >= min_precision)
 
     best.pop("rank", None)
     best["objective"] = objective
     best["min_precision"] = min_precision
+    best["contradiction_weight"] = float(contradiction_weight)
     return best
 
 
@@ -175,12 +243,14 @@ def decision_config_path(ckpt_dir: str) -> str:
 def save_decision_config(
     ckpt_dir: str,
     positive_margin_threshold: float,
+    contradiction_weight: float,
     objective: str,
     validation_metrics: Dict[str, float],
 ) -> str:
     path = decision_config_path(ckpt_dir)
     payload = {
         "positive_margin_threshold": float(positive_margin_threshold),
+        "contradiction_weight": float(contradiction_weight),
         "objective": objective,
         "validation_metrics": validation_metrics,
     }
@@ -189,10 +259,22 @@ def save_decision_config(
     return path
 
 
-def load_decision_threshold(ckpt_dir: str, default: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD) -> float:
+def load_decision_params(
+    ckpt_dir: str,
+    default_threshold: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD,
+    default_contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+) -> tuple[float, float]:
     path = decision_config_path(ckpt_dir)
     if not os.path.exists(path):
-        return float(default)
+        return float(default_threshold), float(default_contradiction_weight)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return float(data.get("positive_margin_threshold", default))
+    return (
+        float(data.get("positive_margin_threshold", default_threshold)),
+        float(data.get("contradiction_weight", default_contradiction_weight)),
+    )
+
+
+def load_decision_threshold(ckpt_dir: str, default: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD) -> float:
+    threshold, _ = load_decision_params(ckpt_dir, default_threshold=default)
+    return float(threshold)
