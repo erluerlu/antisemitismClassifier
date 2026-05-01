@@ -38,34 +38,71 @@ def oversample_positive_rows(df: pd.DataFrame, factor: float, seed: int = 42) ->
     return out
 
 
-def dataframe_to_nli_dataset(df: pd.DataFrame, lang: str) -> Dataset:
+def dataframe_to_nli_dataset(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_classes") -> Dataset:
     """Converts a tweet-level dataframe to expanded NLI dataset format."""
-    nli_df = expand_to_nli(df, lang)
+    nli_df = expand_to_nli(df, lang, nli_train_mode=nli_train_mode)
     return Dataset.from_pandas(nli_df, preserve_index=False)
 
-def expand_to_nli(df: pd.DataFrame, lang: str) -> pd.DataFrame:
+
+def _resolve_nli_train_mode(nli_train_mode: str) -> str:
+    """Normalize training mode names while preserving backward compatibility."""
+    mode = str(nli_train_mode).strip().lower()
+    if mode == "both_classes":
+        return "both_classes_contradiction"
+    valid_modes = {
+        "both_classes_contradiction",
+        "both_classes_asymmetric_neutral",
+        "class1_only",
+    }
+    if mode not in valid_modes:
+        raise ValueError(
+            "nli_train_mode must be one of "
+            "'both_classes', 'both_classes_contradiction', "
+            "'both_classes_asymmetric_neutral', or 'class1_only'"
+        )
+    return mode
+
+
+def expand_to_nli(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_classes") -> pd.DataFrame:
     """
     Expands a dataset with bias labels into NLI (Natural Language Inference) format.
-    
-    For each text and its bias label, creates multiple premise-hypothesis pairs
-    where the hypothesis corresponds to each possible bias class.
-    
+
+        nli_train_mode:
+            "both_classes" or "both_classes_contradiction"
+                                                – all hypotheses from class 0 and 1. Wrong-class pairs are
+                                                    always trained as contradiction (current baseline).
+            "both_classes_asymmetric_neutral"
+                                                – class-1 hypotheses on non-antisemitic tweets are trained as
+                                                    neutral, while class-0 hypotheses on antisemitic tweets stay
+                                                    contradiction.
+            "class1_only"   – only class-1 hypotheses: entailment for antisemitic tweets,
+                                                contradiction for non-antisemitic tweets. Class-0 hypotheses
+                                                are entirely omitted from training.
+
     Args:
         df: DataFrame with 'Text' and 'Biased' columns
         lang: Language code ('en' or 'de') for hypothesis selection
-    
+
     Returns:
         DataFrame with columns: premise, hypothesis, nli_label, target_cls, hyp_cls
     """
+    mode = _resolve_nli_train_mode(nli_train_mode)
+
+    # Determine which hypothesis classes to emit.
+    active_classes = ["1"] if mode == "class1_only" else list(HYPOTHESES.keys())
+
     rows = []
     for _, r in df.iterrows():
         text = str(r["Text"])
         gold = str(r["Biased"])
-        for cls in HYPOTHESES.keys():
+        for cls in active_classes:
             for hyp in hypotheses_for_class(cls, lang):
-                # Wenn Hypothese der echten Klasse entspricht: entailment
-                # Sonst: contradiction (nicht neutral, da wir nur 2 Labels haben)
-                nli_label = "entailment" if cls == gold else "contradiction"
+                if cls == gold:
+                    nli_label = "entailment"
+                elif mode == "both_classes_asymmetric_neutral" and gold == "0" and cls == "1":
+                    nli_label = "neutral"
+                else:
+                    nli_label = "contradiction"
                 rows.append({
                     "premise": text,
                     "hypothesis": hyp,

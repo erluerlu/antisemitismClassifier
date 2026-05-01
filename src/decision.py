@@ -12,6 +12,24 @@ DECISION_CONFIG_FILENAME = "decision_config.json"
 DEFAULT_POSITIVE_MARGIN_THRESHOLD = 0.0
 DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K = 2
 DEFAULT_CONTRADICTION_WEIGHT = 1.0
+DEFAULT_CLASS_0_WEIGHT = 0.7  # Dampen non-antisemitic hypotheses to reduce false negatives
+DEFAULT_SCORE_MODE = "entailment_only"
+DEFAULT_NLI_TRAIN_MODE = "both_classes"
+
+
+def _hypothesis_score(
+    entail_prob: float,
+    contradiction_prob: float,
+    contradiction_weight: float,
+    score_mode: str,
+) -> float:
+    """Compute per-hypothesis score according to selected score mode."""
+    mode = str(score_mode).strip().lower()
+    if mode == "entailment_only":
+        return float(entail_prob)
+    if mode == "entailment_minus_contradiction":
+        return float(entail_prob - float(contradiction_weight) * contradiction_prob)
+    raise ValueError("score_mode must be 'entailment_only' or 'entailment_minus_contradiction'")
 
 
 def _to_device(inputs: Dict[str, torch.Tensor], device: torch.device) -> Dict[str, torch.Tensor]:
@@ -27,13 +45,25 @@ def score_text(
     model,
     device: torch.device,
     contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+    class_0_weight: float = DEFAULT_CLASS_0_WEIGHT,
+    score_mode: str = DEFAULT_SCORE_MODE,
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
 ) -> Dict[str, float]:
     """Returns class score per hypothesis class for one text."""
     entail_id = NLI_LABEL2ID["entailment"]
     contradiction_id = NLI_LABEL2ID["contradiction"]
+    # In class1_only mode, class-0 hypotheses were never trained on – skip them
+    # and fix score_0 = 0 so the margin equals score_1 directly.
+    if str(nli_train_mode).strip().lower() == "class1_only":
+        return _score_text_class1_only(
+            text, lang, tokenizer, model, device,
+            contradiction_weight=contradiction_weight,
+            score_mode=score_mode,
+        )
     scores: Dict[str, float] = {}
     for cls in HYPOTHESES.keys():
-        class_scores = []
+        class_scores: list[float] = []
+        entailment_scores: list[float] = []
         for hyp in hypotheses_for_class(cls, lang):
             inputs = tokenizer(text, hyp, return_tensors="pt", truncation=True)
             inputs = _to_device(inputs, device)
@@ -41,17 +71,67 @@ def score_text(
             probs = logits.softmax(-1).detach().cpu().numpy()
             entail_prob = float(probs[entail_id])
             contradiction_prob = float(probs[contradiction_id])
-            class_scores.append(entail_prob - float(contradiction_weight) * contradiction_prob)
+            class_scores.append(
+                _hypothesis_score(
+                    entail_prob=entail_prob,
+                    contradiction_prob=contradiction_prob,
+                    contradiction_weight=contradiction_weight,
+                    score_mode=score_mode,
+                )
+            )
+            entailment_scores.append(entail_prob)
 
         if not class_scores:
             scores[cls] = 0.0
             continue
 
-        top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(class_scores))
-        # Use top-k mean instead of max to reduce one-hypothesis spikes.
-        top_scores = sorted(class_scores, reverse=True)[:top_k]
-        scores[cls] = float(sum(top_scores) / len(top_scores))
+        if cls == "1":
+            # Requested behavior: class 1 score is the maximum hypothesis score.
+            scores[cls] = float(max(class_scores))
+        elif cls == "0":
+            # Requested behavior: class 0 score is mean of all entailment scores.
+            scores[cls] = float(sum(entailment_scores) / len(entailment_scores))
+        else:
+            # Fallback for potential future classes.
+            top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(class_scores))
+            top_scores = sorted(class_scores, reverse=True)[:top_k]
+            scores[cls] = float(sum(top_scores) / len(top_scores))
+    # Apply class_0_weight dampening
+    if "0" in scores:
+        scores["0"] = scores["0"] * float(class_0_weight)
     return scores
+
+
+@torch.no_grad()
+def _score_text_class1_only(
+    text: str,
+    lang: str,
+    tokenizer,
+    model,
+    device: torch.device,
+    contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+    score_mode: str = DEFAULT_SCORE_MODE,
+) -> Dict[str, float]:
+    """Scores using only class-1 hypotheses (class1_only training mode)."""
+    entail_id = NLI_LABEL2ID["entailment"]
+    contradiction_id = NLI_LABEL2ID["contradiction"]
+    class_scores: list[float] = []
+    for hyp in hypotheses_for_class("1", lang):
+        inputs = tokenizer(text, hyp, return_tensors="pt", truncation=True)
+        inputs = _to_device(inputs, device)
+        logits = model(**inputs).logits[0]
+        probs = logits.softmax(-1).detach().cpu().numpy()
+        class_scores.append(
+            _hypothesis_score(
+                entail_prob=float(probs[entail_id]),
+                contradiction_prob=float(probs[contradiction_id]),
+                contradiction_weight=contradiction_weight,
+                score_mode=score_mode,
+            )
+        )
+    score_1 = float(max(class_scores)) if class_scores else 0.0
+    # score_0 fixed at 0 – margin = score_1 directly
+    return {"1": score_1, "0": 0.0}
 
 
 @torch.no_grad()
@@ -62,12 +142,15 @@ def score_text_detailed(
     model,
     device: torch.device,
     contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+    class_0_weight: float = DEFAULT_CLASS_0_WEIGHT,
+    score_mode: str = DEFAULT_SCORE_MODE,
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
 ) -> tuple[Dict[str, float], Dict[str, list[tuple[str, float]]]]:
     """
     Like score_text, but also returns per-hypothesis entailment scores.
 
     Returns:
-        scores: aggregated class score (top-k mean), same as score_text
+        scores: class score (cls1=max hypothesis score, cls0=mean entailment), same as score_text
         hyp_scores: {cls: [(hypothesis_text, score), ...]} sorted descending
     """
     entail_id = NLI_LABEL2ID["entailment"]
@@ -78,6 +161,7 @@ def score_text_detailed(
     for cls in HYPOTHESES.keys():
         hyps = hypotheses_for_class(cls, lang)
         class_scores: list[tuple[str, float]] = []
+        entailment_scores: list[float] = []
         for hyp in hyps:
             inputs = tokenizer(text, hyp, return_tensors="pt", truncation=True)
             inputs = _to_device(inputs, device)
@@ -85,8 +169,16 @@ def score_text_detailed(
             probs = logits.softmax(-1).detach().cpu().numpy()
             entail_prob = float(probs[entail_id])
             contradiction_prob = float(probs[contradiction_id])
-            score = entail_prob - float(contradiction_weight) * contradiction_prob
-            class_scores.append((hyp, score))
+            score = _hypothesis_score(
+                entail_prob=entail_prob,
+                contradiction_prob=contradiction_prob,
+                contradiction_weight=contradiction_weight,
+                score_mode=score_mode,
+            )
+            # For class 0, detailed listing should reflect entailment scores used in aggregation.
+            display_score = entail_prob if cls == "0" else score
+            entailment_scores.append(entail_prob)
+            class_scores.append((hyp, display_score))
 
         if not class_scores:
             scores[cls] = 0.0
@@ -96,9 +188,22 @@ def score_text_detailed(
         sorted_hyps = sorted(class_scores, key=lambda x: x[1], reverse=True)
         hyp_scores[cls] = sorted_hyps
 
-        top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(sorted_hyps))
-        top_scores = [s for _, s in sorted_hyps[:top_k]]
-        scores[cls] = float(sum(top_scores) / len(top_scores))
+        if cls == "1":
+            scores[cls] = float(max([s for _, s in sorted_hyps]))
+        elif cls == "0":
+            scores[cls] = float(sum(entailment_scores) / len(entailment_scores))
+        else:
+            top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(sorted_hyps))
+            top_scores = [s for _, s in sorted_hyps[:top_k]]
+            scores[cls] = float(sum(top_scores) / len(top_scores))
+
+    # Skip class-0 hypotheses entirely in class1_only mode
+    mode = str(nli_train_mode).strip().lower()
+    if mode == "class1_only":
+        scores["0"] = 0.0
+        hyp_scores["0"] = []
+    elif "0" in scores:
+        scores["0"] = scores["0"] * float(class_0_weight)
 
     return scores, hyp_scores
 
@@ -122,6 +227,9 @@ def predict_texts_with_threshold(
     device: torch.device,
     positive_margin_threshold: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD,
     contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+    class_0_weight: float = DEFAULT_CLASS_0_WEIGHT,
+    score_mode: str = DEFAULT_SCORE_MODE,
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
     progress_label: str | None = None,
     log_every: int = 100,
 ) -> List[int]:
@@ -129,7 +237,17 @@ def predict_texts_with_threshold(
     texts_list = list(texts)
     total = len(texts_list)
     for idx, text in enumerate(texts_list, start=1):
-        scores = score_text(text, lang, tokenizer, model, device, contradiction_weight=contradiction_weight)
+        scores = score_text(
+            text,
+            lang,
+            tokenizer,
+            model,
+            device,
+            contradiction_weight=contradiction_weight,
+            class_0_weight=class_0_weight,
+            score_mode=score_mode,
+            nli_train_mode=nli_train_mode,
+        )
         preds.append(int(predict_from_scores(scores, positive_margin_threshold=positive_margin_threshold)))
         if progress_label and (idx % log_every == 0 or idx == total):
             print(f"{progress_label}: {idx}/{total}")
@@ -150,6 +268,9 @@ def tune_positive_margin_threshold(
     threshold_steps: int = 401,
     min_precision: float = 0.0,
     contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
+    class_0_weight: float = DEFAULT_CLASS_0_WEIGHT,
+    score_mode: str = DEFAULT_SCORE_MODE,
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
     progress_label: str | None = None,
     log_every: int = 100,
 ) -> Dict[str, float]:
@@ -157,7 +278,17 @@ def tune_positive_margin_threshold(
     margins: List[float] = []
     total = len(texts)
     for idx, text in enumerate(texts, start=1):
-        scores = score_text(text, lang, tokenizer, model, device, contradiction_weight=contradiction_weight)
+        scores = score_text(
+            text,
+            lang,
+            tokenizer,
+            model,
+            device,
+            contradiction_weight=contradiction_weight,
+            class_0_weight=class_0_weight,
+            score_mode=score_mode,
+            nli_train_mode=nli_train_mode,
+        )
         margins.append(float(scores.get("1", 0.0) - scores.get("0", 0.0)))
         if progress_label and (idx % log_every == 0 or idx == total):
             print(f"{progress_label}: {idx}/{total}")
@@ -232,6 +363,7 @@ def tune_positive_margin_threshold(
     best["objective"] = objective
     best["min_precision"] = min_precision
     best["contradiction_weight"] = float(contradiction_weight)
+    best["nli_train_mode"] = str(nli_train_mode)
     return best
 
 
@@ -244,13 +376,17 @@ def save_decision_config(
     ckpt_dir: str,
     positive_margin_threshold: float,
     contradiction_weight: float,
+    score_mode: str,
     objective: str,
     validation_metrics: Dict[str, float],
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
 ) -> str:
     path = decision_config_path(ckpt_dir)
     payload = {
         "positive_margin_threshold": float(positive_margin_threshold),
         "contradiction_weight": float(contradiction_weight),
+        "score_mode": str(score_mode),
+        "nli_train_mode": str(nli_train_mode),
         "objective": objective,
         "validation_metrics": validation_metrics,
     }
@@ -263,18 +399,22 @@ def load_decision_params(
     ckpt_dir: str,
     default_threshold: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD,
     default_contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT,
-) -> tuple[float, float]:
+    default_score_mode: str = DEFAULT_SCORE_MODE,
+    default_nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
+) -> tuple[float, float, str, str]:
     path = decision_config_path(ckpt_dir)
     if not os.path.exists(path):
-        return float(default_threshold), float(default_contradiction_weight)
+        return float(default_threshold), float(default_contradiction_weight), str(default_score_mode), str(default_nli_train_mode)
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return (
         float(data.get("positive_margin_threshold", default_threshold)),
         float(data.get("contradiction_weight", default_contradiction_weight)),
+        str(data.get("score_mode", default_score_mode)),
+        str(data.get("nli_train_mode", default_nli_train_mode)),
     )
 
 
 def load_decision_threshold(ckpt_dir: str, default: float = DEFAULT_POSITIVE_MARGIN_THRESHOLD) -> float:
-    threshold, _ = load_decision_params(ckpt_dir, default_threshold=default)
+    threshold, _, _, _ = load_decision_params(ckpt_dir, default_threshold=default)
     return float(threshold)

@@ -1,99 +1,70 @@
 HYPOTHESES = {
     "1": {
         "de": [
-            # 🔴 Direkte Feindseligkeit
-            "Der Text enthält Hass, Feindseligkeit oder Abwertung gegenüber Juden.",
-            "Der Text stellt Juden als negativ, gefährlich oder minderwertig dar.",
-
-            # 🔴 Verschwörung / Macht-Narrative
-            "Der Text behauptet oder suggeriert, dass Juden übermäßigen Einfluss oder Kontrolle über Medien, Politik oder Wirtschaft haben.",
-            "Der Text impliziert, dass Juden im Hintergrund die Kontrolle ausüben oder Ereignisse steuern.",
-
-            # 🔴 Kollektivschuld
-            "Der Text macht Juden als Gruppe für politische, wirtschaftliche oder historische Ereignisse verantwortlich.",
-            "Der Text schreibt Juden pauschal negative Eigenschaften oder Handlungen zu.",
-
-            # 🔴 Israel-/Zionismus-Verschiebung
-            "Der Text verwendet Israel oder Zionisten als Ersatz für Juden, um negative Aussagen über Juden zu machen.",
-            "Der Text greift Israel oder Zionisten in einer Weise an, die auf Juden als gesamte Gruppe abzielt.",
-
-            # 🔴 „Ich habe nichts gegen Juden, aber…“
-            "Der Text relativiert antisemitische Aussagen durch scheinbare Distanzierung von Juden.",
-            "Der Text enthält Aussagen wie 'Ich habe nichts gegen Juden, aber' gefolgt von negativen Verallgemeinerungen.",
-
-            # 🔴 Dogwhistles / Codesprache
-            "Der Text verwendet stereotype oder codierte Sprache, die typisch für antisemitische Narrative ist.",
-            "Der Text deutet antisemitische Inhalte indirekt oder implizit an.",
-
-            # 🔴 Holocaust / NS-Vergleiche
-            "Der Text relativiert, leugnet oder verzerrt den Holocaust.",
-            "Der Text nutzt unangemessene Nazi-Vergleiche gegen Juden oder Israel.",
-
-            # 🔴 Entmenschlichung
-            "Der Text entmenschlicht Juden oder stellt sie als weniger wert dar.",
-
-            # 🔴 Klassische Narrative
-            "Der Text behauptet, dass Juden Konflikte oder Kriege absichtlich verursachen.",
-            "Der Text stellt Juden als eine koordinierte oder verschwörerische Gruppe dar.",
+            # 🔴 Direkte Feindseligkeit & Dämonisierung
+            "Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.",
+            "Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.",
+            
+            # 🔴 Verschwörung & Macht
+            "Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.",
+            "Der Text unterstellt Juden eine angeborene Gier oder eine illegitime Macht durch Geld und Bankwesen.",
+            
+            # 🔴 Israel-/Zionismus-Verschiebung (Recall-Booster)
+            "Der Text setzt das Handeln des Staates Israel oder von Zionisten mit den Verbrechen der Nationalsozialisten gleich.",
+            "Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.",
+            "Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.",
+            
+            # 🔴 Kollektivschuld & Doppelstandards
+            "Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.",
+            "Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.",
+            
+            # 🔴 Holocaust
+            "Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.",
         ],
-
         "en": [
-            # 🔴 Hostility
-            "The text expresses hostility, hatred, or derogatory attitudes toward Jews.",
-            "The text portrays Jews as dangerous, inferior, or negative.",
-
-            # 🔴 Conspiracy
-            "The text claims or suggests that Jews have excessive influence over media, politics, or finance.",
-            "The text implies that Jews secretly control events or institutions.",
-
-            # 🔴 Collective blame
-            "The text blames Jews as a group for political, economic, or historical events.",
-            "The text assigns negative traits or actions to Jews as a group.",
-
-            # 🔴 Israel substitution
-            "The text uses Israel or Zionists as a proxy to make negative claims about Jews.",
-            "The text criticizes Israel or Zionists in a way that targets Jews as a whole.",
-
-            # 🔴 Disclaimer pattern
-            "The text uses disclaimers like 'I have nothing against Jews, but' followed by generalizations.",
-            "The text downplays antisemitism while still expressing harmful stereotypes.",
-
-            # 🔴 Dogwhistles
-            "The text uses coded or indirect language associated with antisemitic narratives.",
-            "The text implies antisemitic ideas without stating them explicitly.",
-
-            # 🔴 Holocaust distortion
-            "The text denies, trivializes, or distorts the Holocaust.",
-            "The text makes inappropriate Nazi comparisons involving Jews or Israel.",
-
-            # 🔴 Dehumanization
-            "The text dehumanizes Jews or portrays them as less worthy.",
-
-            # 🔴 Classic tropes
-            "The text claims that Jews are responsible for causing conflicts or wars.",
-            "The text portrays Jews as a coordinated or conspiratorial group.",
+            # 🔴 Hostility & Dehumanization
+            "The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.",
+            "The text uses dehumanizing terms like animals, parasites, or devils for Jewish people or the State of Israel.",
+            
+            # 🔴 Conspiracy & Power
+            "The text claims that Jews secretly control global politics, the financial system, or the media.",
+            "The text implies innate greed or illegitimate power through money and banking.",
+            
+            # 🔴 Israel/Zionism Shift
+            "The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.",
+            "The text uses 'Zionists' as a code word to project malicious traits onto Jews.",
+            "The text denies Israel's right to exist or calls for violence against its Jewish population.",
+            
+            # 🔴 Collective Blame & Double Standards
+            "The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.",
+            "The text demands standards of behavior from Jews or Israel not expected of any other democratic nation.",
+            
+            # 🔴 Holocaust
+            "The text denies, trivializes, or distorts the historical facts of the Holocaust.",
         ],
     },
-
     "0": {
         "de": [
-            "Der Text enthält keine Feindseligkeit oder Abwertung gegenüber Juden.",
-            "Der Text beschreibt politische oder gesellschaftliche Themen ohne antisemitische Inhalte.",
-            "Der Text kritisiert die Politik eines Staates, ohne Juden als Gruppe anzugreifen.",
-            "Der Text enthält keine pauschalen Aussagen über Juden.",
-            "Der Text verwendet keine antisemitischen Stereotype oder Narrative.",
-            "Der Text ist neutral oder sachlich in Bezug auf Juden.",
-            "Der Text erwähnt Juden oder Israel ohne negative Verallgemeinerung.",
-        ],
+            # 🟢 Sachliche politische Kritik ohne Kollektivzuschreibung
+            "Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.",
+            "Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.",
+            "Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.",
 
+            # 🟢 Differenzierung statt Generalisierung
+            "Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.",
+            "Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.",
+            "Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.",
+        ],
         "en": [
-            "The text does not express hostility or derogatory attitudes toward Jews.",
-            "The text discusses political or social issues without antisemitic content.",
-            "The text criticizes a government or policy without targeting Jews as a group.",
-            "The text does not make generalizations about Jews.",
-            "The text does not use antisemitic stereotypes or narratives.",
-            "The text is neutral or factual regarding Jews.",
-            "The text mentions Jews or Israel without negative generalization.",
+            # 🟢 Political criticism without collective blame
+            "The text criticizes state, military, or party-political actions without holding Jews as a group responsible.",
+            "The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.",
+            "The text discusses Israel, a government, institutions, or political actors without turning this into claims about Jews in general.",
+
+            # 🟢 Differentiation instead of generalization
+            "The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.",
+            "The text contains no blanket negative attribution toward Jews as a religious or ethnic community.",
+            "The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.",
         ],
     },
 }

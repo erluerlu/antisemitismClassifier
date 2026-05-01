@@ -7,7 +7,7 @@ from sklearn.metrics import classification_report, confusion_matrix, f1_score, p
 from transformers import AutoModelForSequenceClassification, Trainer
 
 from .dataset import load_nli_dataset
-from .decision import load_decision_params, score_text_detailed, predict_from_scores
+from .decision import DEFAULT_NLI_TRAIN_MODE, DEFAULT_SCORE_MODE, load_decision_params, score_text_detailed, predict_from_scores
 from .infer import load_nli_model, predict_label_with
 from .tokenizer_utils import load_tokenizer
 from .train import compute_metrics, tokenize_fn
@@ -21,10 +21,14 @@ def predict_texts(
     device,
     positive_margin_threshold: float = 0.0,
     contradiction_weight: float = 1.0,
+    class_0_weight: float = 0.7,
+    score_mode: str = DEFAULT_SCORE_MODE,
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
 ):
     """Predict labels for raw texts using thresholded hypothesis-based NLI."""
     predictions = []
     detailed_scores = []  # list of {cls: [(hyp, score), ...]} per sample
+    class_scores = []  # list of {"0": float, "1": float, "margin": float}
     for text in texts:
         scores, hyp_scores = score_text_detailed(
             text=text,
@@ -33,11 +37,27 @@ def predict_texts(
             model=model,
             device=device,
             contradiction_weight=contradiction_weight,
+            class_0_weight=class_0_weight,
+            score_mode=score_mode,
+            nli_train_mode=nli_train_mode,
         )
         pred = predict_from_scores(scores, positive_margin_threshold=positive_margin_threshold)
         predictions.append(int(pred))
         detailed_scores.append(hyp_scores)
-    return predictions, detailed_scores
+        score_0 = float(scores.get("0", 0.0))
+        score_1 = float(scores.get("1", 0.0))
+        class_scores.append({"0": score_0, "1": score_1, "margin": score_1 - score_0})
+    return predictions, detailed_scores, class_scores
+
+
+def _print_class_scores(row: pd.Series) -> None:
+    """Print aggregated class scores and decision margin for one example."""
+    print(
+        "    Class scores: "
+        f"score_0={float(row.get('_score_0', 0.0)):.4f}, "
+        f"score_1={float(row.get('_score_1', 0.0)):.4f}, "
+        f"margin={float(row.get('_margin', 0.0)):.4f}"
+    )
 
 
 def _print_top_hypotheses(hyp_scores: dict | None, top_k: int = 2) -> None:
@@ -61,6 +81,8 @@ def evaluate_with_analysis(
     show_examples: int = 10,
     positive_margin_threshold: float | None = None,
     contradiction_weight: float | None = None,
+    class_0_weight: float | None = None,
+    score_mode: str | None = None,
 ):
     """Evaluate checkpoint with confusion matrix, positive-class metrics and error examples."""
     print(f"Loading checkpoint from: {checkpoint_path}")
@@ -70,14 +92,22 @@ def evaluate_with_analysis(
 
     tokenizer, model, device = load_nli_model(checkpoint_path)
 
-    cfg_threshold, cfg_contradiction_weight = load_decision_params(checkpoint_path)
+    cfg_threshold, cfg_contradiction_weight, cfg_score_mode, cfg_nli_train_mode = load_decision_params(checkpoint_path)
     threshold = cfg_threshold if positive_margin_threshold is None else float(positive_margin_threshold)
     contradiction_weight_used = (
         cfg_contradiction_weight if contradiction_weight is None else float(contradiction_weight)
     )
+    class_0_weight_used = 0.7 if class_0_weight is None else float(class_0_weight)
+    score_mode_used = cfg_score_mode if score_mode is None else str(score_mode)
+    nli_train_mode_used = cfg_nli_train_mode
 
     print(f"Decision threshold (margin score_1-score_0): {threshold:.4f}")
-    print(f"Hypothesis score formula: entailment - {contradiction_weight_used:.4f} * contradiction")
+    if score_mode_used == "entailment_only":
+        print("Hypothesis score formula: entailment")
+    else:
+        print(f"Hypothesis score formula: entailment - {contradiction_weight_used:.4f} * contradiction")
+    print(f"Score mode: {score_mode_used}")
+    print(f"Class-0 weight (non-antisemitic dampening): {class_0_weight_used:.4f}")
 
     df = pd.read_csv(test_csv)
     df = df.dropna(subset=["Text", "Biased"])
@@ -89,7 +119,7 @@ def evaluate_with_analysis(
     print(f"Class distribution: {pd.Series(true_labels).value_counts().to_dict()}")
     print("\nMaking predictions...")
 
-    predictions, detailed_scores = predict_texts(
+    predictions, detailed_scores, class_scores = predict_texts(
         texts,
         lang,
         tokenizer,
@@ -97,8 +127,14 @@ def evaluate_with_analysis(
         device,
         positive_margin_threshold=threshold,
         contradiction_weight=contradiction_weight_used,
+        class_0_weight=class_0_weight_used,
+        score_mode=score_mode_used,
+        nli_train_mode=nli_train_mode_used,
     )
     df["_hyp_scores"] = detailed_scores
+    df["_score_0"] = [entry["0"] for entry in class_scores]
+    df["_score_1"] = [entry["1"] for entry in class_scores]
+    df["_margin"] = [entry["margin"] for entry in class_scores]
 
     y_true = np.array(true_labels)
     y_pred = np.array(predictions)
@@ -163,6 +199,7 @@ def evaluate_with_analysis(
         print("=" * 80)
         for idx, row in tp.head(show_examples).iterrows():
             print(f"\n[{idx}] {row['Text'][:200]}{'...' if len(row['Text']) > 200 else ''}")
+            _print_class_scores(row)
             _print_top_hypotheses(row.get("_hyp_scores"))
 
     if len(fp) > 0:
@@ -175,6 +212,7 @@ def evaluate_with_analysis(
         for idx, row in fp.head(show_examples).iterrows():
             print(f"\n[{idx}] TRUE LABEL: Non-Antisemitic (0)")
             print(f"    {row['Text'][:200]}{'...' if len(row['Text']) > 200 else ''}")
+            _print_class_scores(row)
             _print_top_hypotheses(row.get("_hyp_scores"))
 
     if len(fn) > 0:
@@ -187,6 +225,7 @@ def evaluate_with_analysis(
         for idx, row in fn.head(show_examples).iterrows():
             print(f"\n[{idx}] TRUE LABEL: Antisemitic (1)")
             print(f"    {row['Text'][:200]}{'...' if len(row['Text']) > 200 else ''}")
+            _print_class_scores(row)
             _print_top_hypotheses(row.get("_hyp_scores"))
 
     print("\n" + "=" * 80)
@@ -304,6 +343,19 @@ def main():
         default=None,
         help="Optional override for hypothesis scoring: entailment - weight * contradiction.",
     )
+    parser.add_argument(
+        "--class_0_weight",
+        type=float,
+        default=None,
+        help="Optional weight for non-antisemitic (class 0) hypotheses (default: 0.7). Lower values reduce false negatives.",
+    )
+    parser.add_argument(
+        "--score_mode",
+        type=str,
+        default=None,
+        choices=["entailment_only", "entailment_minus_contradiction"],
+        help="Hypothesis score mode. Defaults to checkpoint config or entailment_only.",
+    )
 
     args = parser.parse_args()
 
@@ -314,6 +366,8 @@ def main():
         args.show_examples,
         positive_margin_threshold=args.threshold,
         contradiction_weight=args.contradiction_weight,
+        class_0_weight=args.class_0_weight,
+        score_mode=args.score_mode,
     )
 
     return results

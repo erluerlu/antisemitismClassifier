@@ -4,7 +4,7 @@ from typing import TypedDict
 import torch
 from transformers import AutoModelForSequenceClassification
 
-from .decision import load_decision_params, predict_from_scores, score_text
+from .decision import DEFAULT_NLI_TRAIN_MODE, DEFAULT_SCORE_MODE, load_decision_params, predict_from_scores, score_text
 from .tokenizer_utils import load_tokenizer
 
 
@@ -55,6 +55,9 @@ def predict_label_with(
     device: str | torch.device | None = None,
     positive_margin_threshold: float = 0.0,
     contradiction_weight: float = 1.0,
+    class_0_weight: float = 0.7,
+    score_mode: str = DEFAULT_SCORE_MODE,
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE,
 ):
     """Predicts one label from a preloaded model using thresholded NLI margin."""
     resolved_device = _resolve_device(device)
@@ -66,6 +69,9 @@ def predict_label_with(
         model=mdl,
         device=resolved_device,
         contradiction_weight=contradiction_weight,
+        class_0_weight=class_0_weight,
+        score_mode=score_mode,
+        nli_train_mode=nli_train_mode,
     )
     pred = predict_from_scores(scores, positive_margin_threshold=positive_margin_threshold)
     return pred, scores
@@ -78,6 +84,8 @@ def predict_label(
     ckpt_dir: str,
     positive_margin_threshold: float | None = None,
     contradiction_weight: float | None = None,
+    class_0_weight: float | None = None,
+    score_mode: str | None = None,
 ):
     """
     One-shot prediction API.
@@ -85,13 +93,15 @@ def predict_label(
     If score params are None, uses checkpoint decision_config.json when available.
     """
     tok, mdl, device = load_nli_model(ckpt_dir)
-    cfg_threshold, cfg_contradiction_weight = load_decision_params(ckpt_dir)
+    cfg_threshold, cfg_contradiction_weight, cfg_score_mode, cfg_nli_train_mode = load_decision_params(ckpt_dir)
     threshold = (
         cfg_threshold if positive_margin_threshold is None else float(positive_margin_threshold)
     )
     contradiction_weight_used = (
         cfg_contradiction_weight if contradiction_weight is None else float(contradiction_weight)
     )
+    class_0_weight_used = 0.7 if class_0_weight is None else float(class_0_weight)
+    score_mode_used = cfg_score_mode if score_mode is None else str(score_mode)
     pred, scores = predict_label_with(
         text=text,
         lang=lang,
@@ -100,6 +110,9 @@ def predict_label(
         device=device,
         positive_margin_threshold=threshold,
         contradiction_weight=contradiction_weight_used,
+        class_0_weight=class_0_weight_used,
+        score_mode=score_mode_used,
+        nli_train_mode=cfg_nli_train_mode,
     )
     return pred, scores
 
@@ -124,6 +137,8 @@ def classify_text(
     ckpt_dir: str,
     positive_margin_threshold: float | None = None,
     contradiction_weight: float | None = None,
+    class_0_weight: float | None = None,
+    score_mode: str | None = None,
 ) -> ClassificationResult:
     """
     Classifies one raw text as antisemitic (1) or non-antisemitic (0).
@@ -131,13 +146,15 @@ def classify_text(
     Returns label, class probabilities, raw class entailment scores and margin.
     """
     tok, mdl, device = load_nli_model(ckpt_dir)
-    cfg_threshold, cfg_contradiction_weight = load_decision_params(ckpt_dir)
+    cfg_threshold, cfg_contradiction_weight, cfg_score_mode, cfg_nli_train_mode = load_decision_params(ckpt_dir)
     threshold = (
         cfg_threshold if positive_margin_threshold is None else float(positive_margin_threshold)
     )
     contradiction_weight_used = (
         cfg_contradiction_weight if contradiction_weight is None else float(contradiction_weight)
     )
+    class_0_weight_used = 0.7 if class_0_weight is None else float(class_0_weight)
+    score_mode_used = cfg_score_mode if score_mode is None else str(score_mode)
 
     pred, scores = predict_label_with(
         text=text,
@@ -147,6 +164,9 @@ def classify_text(
         device=device,
         positive_margin_threshold=threshold,
         contradiction_weight=contradiction_weight_used,
+        class_0_weight=class_0_weight_used,
+        score_mode=score_mode_used,
+        nli_train_mode=cfg_nli_train_mode,
     )
 
     prob_0, prob_1 = _binary_class_probabilities_from_scores(scores)
@@ -184,6 +204,19 @@ def main():
         default=None,
         help="Optional override for hypothesis scoring: entailment - weight * contradiction.",
     )
+    parser.add_argument(
+        "--class_0_weight",
+        type=float,
+        default=None,
+        help="Optional weight for non-antisemitic (class 0) hypotheses (default: 0.7). Lower values reduce false negatives.",
+    )
+    parser.add_argument(
+        "--score_mode",
+        type=str,
+        default=None,
+        choices=["entailment_only", "entailment_minus_contradiction"],
+        help="Hypothesis score mode. Defaults to checkpoint config or entailment_only.",
+    )
     args = parser.parse_args()
 
     out = classify_text(
@@ -192,6 +225,8 @@ def main():
         ckpt_dir=args.checkpoint,
         positive_margin_threshold=args.threshold,
         contradiction_weight=args.contradiction_weight,
+        class_0_weight=args.class_0_weight,
+        score_mode=args.score_mode,
     )
 
     print("Prediction:", out["label_name"], f"({out['label_int']})")

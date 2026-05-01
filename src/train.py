@@ -1,5 +1,6 @@
 import os
 import time
+import json
 from tkinter import NONE
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from transformers import (
     AutoModelForSequenceClassification,
     TrainingArguments,
     Trainer,
+    TrainerCallback,
     DataCollatorWithPadding,
     EarlyStoppingCallback,
 )
@@ -20,7 +22,9 @@ from .hypotheses import NLI_LABEL2ID
 from .tokenizer_utils import load_tokenizer
 from .decision import (
     DEFAULT_CONTRADICTION_WEIGHT,
+    DEFAULT_NLI_TRAIN_MODE,
     DEFAULT_POSITIVE_MARGIN_THRESHOLD,
+    DEFAULT_SCORE_MODE,
     predict_texts_with_threshold,
     save_decision_config,
     tune_positive_margin_threshold,
@@ -35,12 +39,12 @@ class Config:
     model_name: str = "xlm-roberta-base"
     output_dir: str = "checkpoints/xlmr-nli"
     lr: float = 2e-5
-    epochs: int = 8
+    epochs: int = 4
     batch_size: int = 16
     gradient_accumulation_steps: int = 8
     weight_decay: float = 0.01
     warmup_ratio: float = 0.06
-    seed: int = 42
+    seed: int = 72
     pos_oversample_factor: float = 3.0
     positive_sample_weight: float = 1.0
     en_pos_oversample_factor: float = 3.0
@@ -48,13 +52,16 @@ class Config:
     en_positive_sample_weight: float = 1.0
     de_positive_sample_weight: float = 3.0
     threshold_objective: str = "recall_at_precision"
-    threshold_min_precision: float = 0.5
+    threshold_min_precision: float = 0.4
     threshold_search_min: float = -0.5
     threshold_search_max: float = 0.5
     contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT
-    model_selection_objective: str = "recall_at_precision"
-    model_selection_min_precision: float = 0.45
-    model_selection_last_k_checkpoints: int = 3
+    score_mode: str = DEFAULT_SCORE_MODE
+    nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE
+    class_0_weight: float = 0.7
+    model_selection_objective: str = "recall"
+    model_selection_min_precision: float = 0.3
+    model_selection_last_k_checkpoints: int = 0
 
 
 def _print_class_distribution(name: str, df: pd.DataFrame):
@@ -179,6 +186,88 @@ def _rank_tweet_metrics(metrics: dict[str, float], objective: str, min_precision
     raise ValueError("model_selection_objective must be 'f1', 'recall', or 'recall_at_precision'")
 
 
+def _append_tweet_level_checkpoint_metrics(output_dir: str, payload: dict[str, float | int | str | bool]) -> str:
+    """Append per-checkpoint tweet-level metrics to a JSONL log file."""
+    path = os.path.join(output_dir, "tweet_level_checkpoint_metrics.jsonl")
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    return path
+
+
+class TweetLevelCheckpointEvalCallback(TrainerCallback):
+    """Run tweet-level validation scoring at each evaluation step."""
+
+    def __init__(self, val_texts: list[str], val_labels: list[int], lang: str, tokenizer, cfg: Config):
+        self.val_texts = val_texts
+        self.val_labels = val_labels
+        self.lang = lang
+        self.tokenizer = tokenizer
+        self.cfg = cfg
+
+    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+        model = kwargs.get("model")
+        output_dir = args.output_dir or self.cfg.output_dir
+        if model is None or not self.val_texts or not output_dir:
+            return
+
+        checkpoint_dir = os.path.join(output_dir, f"checkpoint-{state.global_step}")
+        print("\n" + "-" * 80)
+        print(f"Tweet-level validation scoring at eval step: {checkpoint_dir}")
+        print("-" * 80)
+
+        preds = predict_texts_with_threshold(
+            texts=self.val_texts,
+            lang=self.lang,
+            tokenizer=self.tokenizer,
+            model=model,
+            device=model.device,
+            positive_margin_threshold=DEFAULT_POSITIVE_MARGIN_THRESHOLD,
+            contradiction_weight=self.cfg.contradiction_weight,
+            class_0_weight=self.cfg.class_0_weight,
+            score_mode=self.cfg.score_mode,
+            nli_train_mode=self.cfg.nli_train_mode,
+            progress_label=f"Tweet-level scoring {os.path.basename(checkpoint_dir)}",
+        )
+        tweet_metrics = _tweet_metrics(self.val_labels, preds)
+        tweet_metrics["constraint_satisfied"] = bool(
+            tweet_metrics["precision"] >= self.cfg.model_selection_min_precision
+        )
+
+        # Inject tweet-level metrics into Trainer eval metrics so metric_for_best_model
+        # and EarlyStoppingCallback can operate on the actual task metric.
+        sink = metrics if isinstance(metrics, dict) else kwargs.get("metrics")
+        if not isinstance(sink, dict):
+            sink = None
+        if sink is not None:
+            sink["eval_tweet_precision"] = float(tweet_metrics["precision"])
+            sink["eval_tweet_recall"] = float(tweet_metrics["recall"])
+            sink["eval_tweet_f1"] = float(tweet_metrics["f1"])
+            sink["eval_tweet_constraint_satisfied"] = bool(tweet_metrics["constraint_satisfied"])
+
+        payload = {
+            "checkpoint": checkpoint_dir,
+            "global_step": int(state.global_step),
+            "epoch": float(state.epoch) if state.epoch is not None else -1.0,
+            "precision": float(tweet_metrics["precision"]),
+            "recall": float(tweet_metrics["recall"]),
+            "f1": float(tweet_metrics["f1"]),
+            "constraint_satisfied": bool(tweet_metrics["constraint_satisfied"]),
+            "score_mode": self.cfg.score_mode,
+            "class_0_weight": float(self.cfg.class_0_weight),
+            "contradiction_weight": float(self.cfg.contradiction_weight),
+        }
+        metrics_path = _append_tweet_level_checkpoint_metrics(output_dir, payload)
+        print(
+            "Tweet-level checkpoint metrics: "
+            f"p={payload['precision']:.4f} "
+            f"r={payload['recall']:.4f} "
+            f"f1={payload['f1']:.4f} "
+            f"constraint_satisfied={payload['constraint_satisfied']}"
+        )
+        print(f"Saved tweet-level checkpoint metrics: {metrics_path}")
+        return
+
+
 def _list_candidate_checkpoint_dirs(output_dir: str) -> list[str]:
     """Returns candidate model directories (all checkpoint-* plus output_dir itself)."""
     candidates: list[str] = []
@@ -267,6 +356,9 @@ def _select_best_checkpoint_by_tweet_objective(
                 device=device,
                 positive_margin_threshold=DEFAULT_POSITIVE_MARGIN_THRESHOLD,
                 contradiction_weight=cfg.contradiction_weight,
+                class_0_weight=cfg.class_0_weight,
+                score_mode=cfg.score_mode,
+                nli_train_mode=cfg.nli_train_mode,
                 progress_label=f"Scoring validation tweets for {os.path.basename(ckpt)}",
             )
             metrics = _tweet_metrics(val_labels, preds)
@@ -335,11 +427,13 @@ def train_stage(
     if test_df is not None:
         _print_class_distribution("Test", test_df)
 
-    train_ds = dataframe_to_nli_dataset(train_df, lang)
-    val_ds = dataframe_to_nli_dataset(val_df, lang) if val_df is not None else None
+    train_ds = dataframe_to_nli_dataset(train_df, lang, nli_train_mode=cfg.nli_train_mode)
+    val_ds = dataframe_to_nli_dataset(val_df, lang, nli_train_mode=cfg.nli_train_mode) if val_df is not None else None
+    val_texts = [str(x) for x in val_df["Text"].tolist()] if val_df is not None else []
+    val_labels = [int(x) for x in val_df["Biased"].tolist()] if val_df is not None else []
 
     if test_df is not None:
-        test_nli_len = len(dataframe_to_nli_dataset(test_df, lang))
+        test_nli_len = len(dataframe_to_nli_dataset(test_df, lang, nli_train_mode=cfg.nli_train_mode))
         print(f"Test set: {test_nli_len} NLI samples (held out for final evaluation)")
 
     ds_dict = DatasetDict({"train": train_ds, "validation": val_ds}) if val_ds else DatasetDict({"train": train_ds})
@@ -399,9 +493,9 @@ def train_stage(
         save_steps=200,
         eval_steps=200,
         load_best_model_at_end=True if val_ds else False,
-        metric_for_best_model="recall_entailment",
+        metric_for_best_model="tweet_recall",
         greater_is_better=True,
-        save_total_limit=5,  # Keep last 5 checkpoints for model-selection flexibility
+        save_total_limit=10,  # Keep last 5 checkpoints for model-selection flexibility
         seed=cfg.seed,
         report_to=[],
     )
@@ -418,7 +512,8 @@ def train_stage(
     trainer.compute_loss = compute_loss
 
     if val_ds:
-        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=5))
+        trainer.add_callback(TweetLevelCheckpointEvalCallback(val_texts, val_labels, lang, tokenizer, cfg))
+        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=3))
 
     # Keep run start timestamp so we can detect checkpoints written/updated by this run.
     run_start_ts = time.time()
@@ -428,9 +523,6 @@ def train_stage(
 
     # Select best checkpoint by tweet-level objective to align with final task goal.
     if val_df is not None and len(val_df) > 0:
-        val_texts = [str(x) for x in val_df["Text"].tolist()]
-        val_labels = [int(x) for x in val_df["Biased"].tolist()]
-
         current_checkpoints: list[str] = []
         if os.path.isdir(args.output_dir):
             for name in os.listdir(args.output_dir):
@@ -513,12 +605,17 @@ def train_stage(
             threshold_max=cfg.threshold_search_max,
             min_precision=cfg.threshold_min_precision,
             contradiction_weight=cfg.contradiction_weight,
+            class_0_weight=cfg.class_0_weight,
+            score_mode=cfg.score_mode,
+            nli_train_mode=cfg.nli_train_mode,
             progress_label="Threshold calibration scoring",
         )
         cfg_path = save_decision_config(
             ckpt_dir=best_dir,
             positive_margin_threshold=threshold_result["threshold"],
             contradiction_weight=cfg.contradiction_weight,
+            score_mode=cfg.score_mode,
+            nli_train_mode=cfg.nli_train_mode,
             objective=cfg.threshold_objective,
             validation_metrics=threshold_result,
         )
@@ -531,6 +628,8 @@ def train_stage(
             f"r={threshold_result['recall']:.4f} "
             f"f1={threshold_result['f1']:.4f} "
             f"contradiction_weight={cfg.contradiction_weight:.4f} "
+            f"score_mode={cfg.score_mode} "
+            f"nli_train_mode={cfg.nli_train_mode} "
             f"constraint_satisfied={threshold_result.get('constraint_satisfied', True)}"
         )
         print(f"Saved decision config: {cfg_path}")
@@ -539,6 +638,8 @@ def train_stage(
             ckpt_dir=best_dir,
             positive_margin_threshold=DEFAULT_POSITIVE_MARGIN_THRESHOLD,
             contradiction_weight=cfg.contradiction_weight,
+            score_mode=cfg.score_mode,
+            nli_train_mode=cfg.nli_train_mode,
             objective="default",
             validation_metrics={},
         )
@@ -647,6 +748,13 @@ if __name__ == "__main__":
         help="Hypothesis score weight for contradiction in score = entailment - weight * contradiction.",
     )
     parser.add_argument(
+        "--score_mode",
+        type=str,
+        default=None,
+        choices=["entailment_only", "entailment_minus_contradiction"],
+        help="Hypothesis score mode used in decision scoring.",
+    )
+    parser.add_argument(
         "--model_selection_objective",
         type=str,
         default=None,
@@ -664,6 +772,31 @@ if __name__ == "__main__":
         type=int,
         default=None,
         help="Only score the latest K checkpoint-* directories from current run (0 disables limit).",
+    )
+    parser.add_argument(
+        "--class_0_weight",
+        type=float,
+        default=None,
+        help="Weight for non-antisemitic (class 0) hypotheses (default: 0.7). Lower values reduce false negatives.",
+    )
+    parser.add_argument(
+        "--nli_train_mode",
+        type=str,
+        default=None,
+        choices=[
+            "both_classes",
+            "both_classes_contradiction",
+            "both_classes_asymmetric_neutral",
+            "class1_only",
+        ],
+        help=(
+            "NLI training mode. 'both_classes'/'both_classes_contradiction' (default): all hypotheses "
+            "from class 0 and 1, wrong-class pairs are contradiction. "
+            "'both_classes_asymmetric_neutral': non-antisemitic tweets paired with class-1 hypotheses "
+            "become neutral, while antisemitic tweets paired with class-0 hypotheses stay contradiction. "
+            "'class1_only': only class-1 hypotheses; class-0 hypotheses are skipped during training "
+            "and inference (score_0 is fixed at 0, margin = score_1)."
+        ),
     )
     parser.add_argument("--skip_evaluation", action="store_true", help="Skip automatic evaluation on test set after training")
     parser.add_argument(
@@ -703,6 +836,9 @@ if __name__ == "__main__":
         "threshold_search_min": args_.threshold_search_min,
         "threshold_search_max": args_.threshold_search_max,
         "contradiction_weight": args_.contradiction_weight,
+        "score_mode": args_.score_mode,
+        "nli_train_mode": args_.nli_train_mode,
+        "class_0_weight": args_.class_0_weight,
         "model_selection_objective": args_.model_selection_objective,
         "model_selection_min_precision": args_.model_selection_min_precision,
         "model_selection_last_k_checkpoints": args_.model_selection_last_k_checkpoints,
@@ -731,7 +867,7 @@ if __name__ == "__main__":
             print("\n" + "-" * 80)
             print("Evaluating German model on held-out test set...")
             print("-" * 80)
-            evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples)
+            evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples, class_0_weight=cfg.class_0_weight)
     else:
         print("\n" + "=" * 80)
         print("STAGE 1: ENGLISH TRAINING")
@@ -769,13 +905,13 @@ if __name__ == "__main__":
                 print("\n" + "-" * 80)
                 print("Evaluating English model on held-out test set...")
                 print("-" * 80)
-                evaluate_with_analysis(en_out, en_test_csv, en_lang, show_examples=args_.show_examples)
+                evaluate_with_analysis(en_out, en_test_csv, en_lang, show_examples=args_.show_examples, class_0_weight=cfg.class_0_weight)
 
             if de_test_csv is not None:
                 print("\n" + "-" * 80)
                 print("Evaluating German model on held-out test set...")
                 print("-" * 80)
-                evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples)
+                evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples, class_0_weight=cfg.class_0_weight)
 
     print("\n" + "=" * 80)
     print("TRAINING COMPLETE")
