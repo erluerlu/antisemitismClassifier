@@ -29,6 +29,7 @@ from .decision import (
     save_decision_config,
     tune_positive_margin_threshold,
 )
+from .logging_utils import redirect_output_to_log
 import torch
 
 
@@ -816,6 +817,12 @@ if __name__ == "__main__":
         default=os.path.join("checkpoints", "xlmr-nli", "de_only"),
         help="Output directory used when --de_only is enabled.",
     )
+    parser.add_argument(
+        "--log_file",
+        type=str,
+        default=None,
+        help="Optional path for the training/evaluation log file.",
+    )
     args_ = parser.parse_args()
 
     if not args_.de_train:
@@ -845,76 +852,100 @@ if __name__ == "__main__":
     }
     cfg = Config(**{k: v for k, v in cfg_overrides.items() if v is not None})
 
-    if args_.de_only:
-        print("\n" + "=" * 80)
-        print("GERMAN TRAINING (DE-ONLY, NO ENGLISH PRETRAINING)")
-        print("=" * 80)
-        cfg.output_dir = args_.de_only_output_dir
-        de_out, de_test_csv, de_lang = train_stage(
-            args_.de_train,
-            args_.de_val,
-            "de",
-            cfg,
-            resume_from=None,
-            val_size=args_.val_size,
-            hold_test_size=args_.test_size,
-        )
+    default_log_dir = args_.de_only_output_dir if args_.de_only else cfg.output_dir
+    log_file = args_.log_file if args_.log_file else os.path.join(default_log_dir, "train.log")
 
-        if not args_.skip_evaluation and de_test_csv is not None:
+    with redirect_output_to_log(log_file):
+        print(f"Writing training/evaluation logs to: {os.path.abspath(log_file)}")
+
+        if args_.de_only:
             print("\n" + "=" * 80)
-            print("FINAL EVALUATION ON HELD-OUT TEST SET")
+            print("GERMAN TRAINING (DE-ONLY, NO ENGLISH PRETRAINING)")
             print("=" * 80)
-            print("\n" + "-" * 80)
-            print("Evaluating German model on held-out test set...")
-            print("-" * 80)
-            evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples, class_0_weight=cfg.class_0_weight)
-    else:
-        print("\n" + "=" * 80)
-        print("STAGE 1: ENGLISH TRAINING")
-        print("=" * 80)
-        en_out, en_test_csv, en_lang = train_stage(
-            args_.en_train,
-            args_.en_val,
-            "en",
-            cfg,
-            resume_from=None,
-            val_size=args_.val_size,
-            hold_test_size=args_.test_size,
-        )
+            cfg.output_dir = args_.de_only_output_dir
+            de_out, de_test_csv, de_lang = train_stage(
+                args_.de_train,
+                args_.de_val,
+                "de",
+                cfg,
+                resume_from=None,
+                val_size=args_.val_size,
+                hold_test_size=args_.test_size,
+            )
 
-        print("\n" + "=" * 80)
-        print("STAGE 2: GERMAN FINE-TUNING")
-        print("=" * 80)
-        cfg.output_dir = os.path.join(cfg.output_dir, "de_ft")
-        de_out, de_test_csv, de_lang = train_stage(
-            args_.de_train,
-            args_.de_val,
-            "de",
-            cfg,
-            resume_from=en_out,
-            val_size=args_.val_size,
-            hold_test_size=args_.test_size,
-        )
-
-        if not args_.skip_evaluation:
-            print("\n" + "=" * 80)
-            print("FINAL EVALUATION ON HELD-OUT TEST SETS")
-            print("=" * 80)
-
-            if en_test_csv is not None:
-                print("\n" + "-" * 80)
-                print("Evaluating English model on held-out test set...")
-                print("-" * 80)
-                evaluate_with_analysis(en_out, en_test_csv, en_lang, show_examples=args_.show_examples, class_0_weight=cfg.class_0_weight)
-
-            if de_test_csv is not None:
+            if not args_.skip_evaluation and de_test_csv is not None:
+                print("\n" + "=" * 80)
+                print("FINAL EVALUATION ON HELD-OUT TEST SET")
+                print("=" * 80)
                 print("\n" + "-" * 80)
                 print("Evaluating German model on held-out test set...")
                 print("-" * 80)
-                evaluate_with_analysis(de_out, de_test_csv, de_lang, show_examples=args_.show_examples, class_0_weight=cfg.class_0_weight)
+                evaluate_with_analysis(
+                    de_out,
+                    de_test_csv,
+                    de_lang,
+                    show_examples=args_.show_examples,
+                    class_0_weight=cfg.class_0_weight,
+                )
+        else:
+            print("\n" + "=" * 80)
+            print("STAGE 1: ENGLISH TRAINING")
+            print("=" * 80)
+            en_out, en_test_csv, en_lang = train_stage(
+                args_.en_train,
+                args_.en_val,
+                "en",
+                cfg,
+                resume_from=None,
+                val_size=args_.val_size,
+                hold_test_size=args_.test_size,
+            )
 
-    print("\n" + "=" * 80)
-    print("TRAINING COMPLETE")
-    print("=" * 80)
-    if torch.cuda.is_available():
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
+            print("\n" + "=" * 80)
+            print("STAGE 2: GERMAN FINE-TUNING")
+            print("=" * 80)
+            cfg.output_dir = os.path.join(cfg.output_dir, "de_ft")
+            de_out, de_test_csv, de_lang = train_stage(
+                args_.de_train,
+                args_.de_val,
+                "de",
+                cfg,
+                resume_from=en_out,
+                val_size=args_.val_size,
+                hold_test_size=args_.test_size,
+            )
+
+            if not args_.skip_evaluation:
+                print("\n" + "=" * 80)
+                print("FINAL EVALUATION ON HELD-OUT TEST SETS")
+                print("=" * 80)
+
+                if en_test_csv is not None:
+                    print("\n" + "-" * 80)
+                    print("Evaluating English model on held-out test set...")
+                    print("-" * 80)
+                    evaluate_with_analysis(
+                        en_out,
+                        en_test_csv,
+                        en_lang,
+                        show_examples=args_.show_examples,
+                        class_0_weight=cfg.class_0_weight,
+                    )
+
+                if de_test_csv is not None:
+                    print("\n" + "-" * 80)
+                    print("Evaluating German model on held-out test set...")
+                    print("-" * 80)
+                    evaluate_with_analysis(
+                        de_out,
+                        de_test_csv,
+                        de_lang,
+                        show_examples=args_.show_examples,
+                        class_0_weight=cfg.class_0_weight,
+                    )
+
+        print("\n" + "=" * 80)
+        print("TRAINING COMPLETE")
+        print("=" * 80)
+        if torch.cuda.is_available():
+            print(f"GPU: {torch.cuda.get_device_name(0)}")

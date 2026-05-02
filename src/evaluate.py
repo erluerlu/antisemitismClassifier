@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import numpy as np
 import pandas as pd
@@ -9,6 +10,7 @@ from transformers import AutoModelForSequenceClassification, Trainer
 from .dataset import load_nli_dataset
 from .decision import DEFAULT_NLI_TRAIN_MODE, DEFAULT_SCORE_MODE, load_decision_params, score_text_detailed, predict_from_scores
 from .infer import load_nli_model, predict_label_with
+from .logging_utils import redirect_output_to_log
 from .tokenizer_utils import load_tokenizer
 from .train import compute_metrics, tokenize_fn
 
@@ -198,7 +200,7 @@ def evaluate_with_analysis(
         )
         print("=" * 80)
         for idx, row in tp.head(show_examples).iterrows():
-            print(f"\n[{idx}] {row['Text'][:200]}{'...' if len(row['Text']) > 200 else ''}")
+            print(f"\n[{idx}] {row['Text']}")
             _print_class_scores(row)
             _print_top_hypotheses(row.get("_hyp_scores"))
 
@@ -211,7 +213,7 @@ def evaluate_with_analysis(
         print("=" * 80)
         for idx, row in fp.head(show_examples).iterrows():
             print(f"\n[{idx}] TRUE LABEL: Non-Antisemitic (0)")
-            print(f"    {row['Text'][:200]}{'...' if len(row['Text']) > 200 else ''}")
+            print(f"    {row['Text']}")
             _print_class_scores(row)
             _print_top_hypotheses(row.get("_hyp_scores"))
 
@@ -224,7 +226,7 @@ def evaluate_with_analysis(
         print("=" * 80)
         for idx, row in fn.head(show_examples).iterrows():
             print(f"\n[{idx}] TRUE LABEL: Antisemitic (1)")
-            print(f"    {row['Text'][:200]}{'...' if len(row['Text']) > 200 else ''}")
+            print(f"    {row['Text']}")
             _print_class_scores(row)
             _print_top_hypotheses(row.get("_hyp_scores"))
 
@@ -356,19 +358,30 @@ def main():
         choices=["entailment_only", "entailment_minus_contradiction"],
         help="Hypothesis score mode. Defaults to checkpoint config or entailment_only.",
     )
+    parser.add_argument(
+        "--log_file",
+        type=str,
+        default=None,
+        help="Optional path for the evaluation log file.",
+    )
 
     args = parser.parse_args()
 
-    results = evaluate_with_analysis(
-        args.checkpoint,
-        args.test_data,
-        args.lang,
-        args.show_examples,
-        positive_margin_threshold=args.threshold,
-        contradiction_weight=args.contradiction_weight,
-        class_0_weight=args.class_0_weight,
-        score_mode=args.score_mode,
-    )
+    log_file = args.log_file if args.log_file else os.path.join(args.checkpoint, "evaluate.log")
+
+    with redirect_output_to_log(log_file):
+        print(f"Writing evaluation logs to: {os.path.abspath(log_file)}")
+
+        results = evaluate_with_analysis(
+            args.checkpoint,
+            args.test_data,
+            args.lang,
+            args.show_examples,
+            positive_margin_threshold=args.threshold,
+            contradiction_weight=args.contradiction_weight,
+            class_0_weight=args.class_0_weight,
+            score_mode=args.score_mode,
+        )
 
     return results
 
