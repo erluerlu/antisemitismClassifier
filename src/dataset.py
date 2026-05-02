@@ -38,9 +38,9 @@ def oversample_positive_rows(df: pd.DataFrame, factor: float, seed: int = 42) ->
     return out
 
 
-def dataframe_to_nli_dataset(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_classes") -> Dataset:
+def dataframe_to_nli_dataset(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_classes", tweet_id_offset: int = 0) -> Dataset:
     """Converts a tweet-level dataframe to expanded NLI dataset format."""
-    nli_df = expand_to_nli(df, lang, nli_train_mode=nli_train_mode)
+    nli_df = expand_to_nli(df, lang, nli_train_mode=nli_train_mode, tweet_id_offset=tweet_id_offset)
     return Dataset.from_pandas(nli_df, preserve_index=False)
 
 
@@ -63,7 +63,7 @@ def _resolve_nli_train_mode(nli_train_mode: str) -> str:
     return mode
 
 
-def expand_to_nli(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_classes") -> pd.DataFrame:
+def expand_to_nli(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_classes", tweet_id_offset: int = 0) -> pd.DataFrame:
     """
     Expands a dataset with bias labels into NLI (Natural Language Inference) format.
 
@@ -91,8 +91,10 @@ def expand_to_nli(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_class
     # Determine which hypothesis classes to emit.
     active_classes = ["1"] if mode == "class1_only" else list(HYPOTHESES.keys())
 
+    lang_id = 0 if str(lang).lower() == "en" else 1
+
     rows = []
-    for _, r in df.iterrows():
+    for tweet_id, (_, r) in enumerate(df.iterrows()):
         text = str(r["Text"])
         gold = str(r["Biased"])
         for cls in active_classes:
@@ -108,7 +110,9 @@ def expand_to_nli(df: pd.DataFrame, lang: str, nli_train_mode: str = "both_class
                     "hypothesis": hyp,
                     "nli_label": NLI_LABEL2ID[nli_label],
                     "target_cls": int(gold),
-                    "hyp_cls": int(cls)
+                    "hyp_cls": int(cls),
+                    "tweet_id": int(tweet_id) + int(tweet_id_offset),
+                    "lang_id": lang_id,
                 })
     return pd.DataFrame(rows)
 

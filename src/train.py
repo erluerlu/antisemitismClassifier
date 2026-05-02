@@ -45,24 +45,29 @@ class Config:
     gradient_accumulation_steps: int = 8
     weight_decay: float = 0.01
     warmup_ratio: float = 0.06
-    seed: int = 72
-    pos_oversample_factor: float = 3.0
+    seed: int = 42
+    pos_oversample_factor: float = 2.0
     positive_sample_weight: float = 1.0
-    en_pos_oversample_factor: float = 3.0
-    de_pos_oversample_factor: float = 6.0
-    en_positive_sample_weight: float = 1.0
-    de_positive_sample_weight: float = 3.0
-    threshold_objective: str = "recall_at_precision"
-    threshold_min_precision: float = 0.4
-    threshold_search_min: float = -0.5
-    threshold_search_max: float = 0.5
+    en_pos_oversample_factor: float = 1.5
+    de_pos_oversample_factor: float = 4.0
+    en_positive_sample_weight: float = 1.5
+    de_positive_sample_weight: float = 2.5
+    threshold_objective: str = "f1"
+    threshold_min_precision: float = 0.5
+    threshold_search_min: float = -0.2
+    threshold_search_max: float = 0.8
     contradiction_weight: float = DEFAULT_CONTRADICTION_WEIGHT
     score_mode: str = DEFAULT_SCORE_MODE
     nli_train_mode: str = DEFAULT_NLI_TRAIN_MODE
     class_0_weight: float = 0.7
-    model_selection_objective: str = "recall"
-    model_selection_min_precision: float = 0.3
+    class_0_loss_weight: float = 0.7
+    model_selection_objective: str = "f1"
+    model_selection_min_precision: float = 0.4
     model_selection_last_k_checkpoints: int = 0
+    tweet_level_loss_weight: float = 0.2
+    tweet_level_margin: float = 0.0
+    de_lang_loss_weight: float = 2.0
+    joint_eval_lang_for_best: str = "de"
 
 
 def _print_class_distribution(name: str, df: pd.DataFrame):
@@ -133,13 +138,25 @@ def tokenize_fn(examples, tokenizer):
     encoded["labels"] = examples["nli_label"]
     encoded["target_cls"] = examples["target_cls"]
     encoded["hyp_cls"] = examples["hyp_cls"]
+    encoded["tweet_id"] = examples["tweet_id"]
+    if "lang_id" in examples:
+        encoded["lang_id"] = examples["lang_id"]
     return encoded
+
+
+_F1_METRIC = None
+_ACC_METRIC = None
 
 
 def compute_metrics(eval_pred):
     """Computes pair-level metrics for trainer logging."""
-    metric_f1 = evaluate.load("f1")
-    metric_acc = evaluate.load("accuracy")
+    global _F1_METRIC, _ACC_METRIC
+    if _F1_METRIC is None:
+        _F1_METRIC = evaluate.load("f1")
+    if _ACC_METRIC is None:
+        _ACC_METRIC = evaluate.load("accuracy")
+    metric_f1 = _F1_METRIC
+    metric_acc = _ACC_METRIC
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
 
@@ -420,6 +437,11 @@ def train_stage(
         print(f"Applied positive oversampling factor: {oversample_factor:.2f}")
 
     print(f"Positive sample loss weight: {positive_sample_weight:.2f}")
+    print(
+        "Tweet-level auxiliary loss: "
+        f"weight={cfg.tweet_level_loss_weight:.3f} "
+        f"margin={cfg.tweet_level_margin:.3f}"
+    )
 
     print("\nTweet-level split summary")
     _print_class_distribution("Train", train_df)
@@ -455,7 +477,9 @@ def train_stage(
         """Compute cross-entropy loss with optional upweighting for positive tweets."""
         labels = inputs.pop("labels", None)
         target_cls = inputs.pop("target_cls", None)
-        _ = inputs.pop("hyp_cls", None)
+        hyp_cls = inputs.pop("hyp_cls", None)
+        tweet_id = inputs.pop("tweet_id", None)
+        lang_id = inputs.pop("lang_id", None)
 
         if labels is None:
             raise ValueError("'labels' not found in batch inputs. Available keys: " + str(list(inputs.keys())))
@@ -466,16 +490,65 @@ def train_stage(
         loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
         sample_losses = loss_fct(logits.view(-1, num_labels), labels.view(-1))
 
+        # Build per-sample weights: upweight positive tweets, downweight class-0 hypothesis rows
+        # so the CE loss is consistent with the dampening applied during decision scoring.
+        weights = torch.ones_like(sample_losses)
         if target_cls is not None and positive_sample_weight != 1.0:
-            cls_tensor = target_cls.view(-1).to(sample_losses.device)
-            sample_weights = torch.where(
-                cls_tensor == 1,
-                torch.full_like(sample_losses, positive_sample_weight),
-                torch.ones_like(sample_losses),
-            )
-            loss = (sample_losses * sample_weights).mean()
-        else:
-            loss = sample_losses.mean()
+            pos_mask = target_cls.view(-1).to(weights.device) == 1
+            weights = torch.where(pos_mask, weights * float(positive_sample_weight), weights)
+        if hyp_cls is not None and cfg.class_0_loss_weight != 1.0:
+            hyp0_mask = hyp_cls.view(-1).to(weights.device) == 0
+            weights = torch.where(hyp0_mask, weights * float(cfg.class_0_loss_weight), weights)
+        if lang_id is not None and cfg.de_lang_loss_weight != 1.0:
+            de_mask = lang_id.view(-1).to(weights.device) == 1
+            weights = torch.where(de_mask, weights * float(cfg.de_lang_loss_weight), weights)
+
+        ce_loss = (sample_losses * weights).sum() / weights.sum().clamp(min=1.0)
+
+        loss = ce_loss
+        # Optional tweet-level margin loss aligned with decision scoring.
+        # Operates on raw entailment logits (not probs) so gradients are well-scaled.
+        if (
+            cfg.tweet_level_loss_weight > 0.0
+            and target_cls is not None
+            and hyp_cls is not None
+            and tweet_id is not None
+        ):
+            entail_logits = logits[:, NLI_LABEL2ID["entailment"]]
+
+            tweet_ids = tweet_id.view(-1).to(logits.device)
+            hyp_classes = hyp_cls.view(-1).to(logits.device)
+            tweet_targets = target_cls.view(-1).to(logits.device).float()
+
+            unique_tweet_ids = torch.unique(tweet_ids)
+            tweet_margins: list[torch.Tensor] = []
+            tweet_labels: list[torch.Tensor] = []
+            neg_inf = torch.tensor(-1e4, device=logits.device)
+            for tid in unique_tweet_ids:
+                tweet_mask = tweet_ids == tid
+                if not torch.any(tweet_mask):
+                    continue
+
+                tweet_entail = entail_logits[tweet_mask]
+                tweet_hyp = hyp_classes[tweet_mask]
+                label = tweet_targets[tweet_mask][0]
+
+                pos_mask = tweet_hyp == 1
+                neg_mask = tweet_hyp == 0
+
+                pos_logit = torch.max(tweet_entail[pos_mask]) if torch.any(pos_mask) else neg_inf
+                neg_logit = torch.max(tweet_entail[neg_mask]) if torch.any(neg_mask) else neg_inf
+                margin = pos_logit - neg_logit
+
+                tweet_margins.append(margin)
+                tweet_labels.append(label)
+
+            if tweet_margins:
+                margin_tensor = torch.stack(tweet_margins)
+                label_tensor = torch.stack(tweet_labels)
+                bias = float(cfg.tweet_level_margin)
+                tweet_loss = torch.nn.functional.binary_cross_entropy_with_logits(margin_tensor - bias, label_tensor)
+                loss = ce_loss + float(cfg.tweet_level_loss_weight) * tweet_loss
 
         return (loss, outputs) if return_outputs else loss
 
@@ -491,10 +564,10 @@ def train_stage(
         eval_strategy="steps" if val_ds else "no",
         save_strategy="steps" if val_ds else "no",
         logging_steps=100,
-        save_steps=200,
-        eval_steps=200,
+        save_steps=300,
+        eval_steps=300,
         load_best_model_at_end=True if val_ds else False,
-        metric_for_best_model="tweet_recall",
+        metric_for_best_model="tweet_f1",
         greater_is_better=True,
         save_total_limit=10,  # Keep last 5 checkpoints for model-selection flexibility
         seed=cfg.seed,
@@ -514,7 +587,7 @@ def train_stage(
 
     if val_ds:
         trainer.add_callback(TweetLevelCheckpointEvalCallback(val_texts, val_labels, lang, tokenizer, cfg))
-        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=3))
+        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=5))
 
     # Keep run start timestamp so we can detect checkpoints written/updated by this run.
     run_start_ts = time.time()
@@ -649,6 +722,295 @@ def train_stage(
     return best_dir, test_csv_path, lang
 
 
+def train_joint_stage(
+    en_train_csv: str,
+    de_train_csv: str,
+    cfg: Config,
+    val_size: float | None = None,
+    hold_test_size: float | None = None,
+):
+    """
+    Joint EN+DE training in a single stage. Avoids EN-knowledge being overwritten
+    during a separate DE fine-tuning step. Validation/test stay language-separated;
+    DE F1 drives best-model selection.
+    """
+    tokenizer = load_tokenizer(cfg.model_name)
+
+    print("Preparing EN splits...")
+    en_train_df, en_val_df, en_test_df, en_test_csv = _prepare_tweet_level_splits(
+        train_csv=en_train_csv, val_csv="", val_size=val_size,
+        hold_test_size=hold_test_size, seed=cfg.seed,
+    )
+    print("Preparing DE splits...")
+    de_train_df, de_val_df, de_test_df, de_test_csv = _prepare_tweet_level_splits(
+        train_csv=de_train_csv, val_csv="", val_size=val_size,
+        hold_test_size=hold_test_size, seed=cfg.seed,
+    )
+
+    if cfg.en_pos_oversample_factor > 1.0:
+        en_train_df = oversample_positive_rows(en_train_df, factor=cfg.en_pos_oversample_factor, seed=cfg.seed)
+        print(f"EN positive oversampling factor: {cfg.en_pos_oversample_factor:.2f}")
+    if cfg.de_pos_oversample_factor > 1.0:
+        de_train_df = oversample_positive_rows(de_train_df, factor=cfg.de_pos_oversample_factor, seed=cfg.seed)
+        print(f"DE positive oversampling factor: {cfg.de_pos_oversample_factor:.2f}")
+
+    print(
+        f"DE language loss weight: {cfg.de_lang_loss_weight:.2f} | "
+        f"EN positive sample weight: {cfg.en_positive_sample_weight:.2f} | "
+        f"DE positive sample weight: {cfg.de_positive_sample_weight:.2f}"
+    )
+
+    print("\nTweet-level split summary (joint)")
+    _print_class_distribution("EN Train", en_train_df)
+    _print_class_distribution("DE Train", de_train_df)
+    if en_val_df is not None:
+        _print_class_distribution("EN Validation", en_val_df)
+    if de_val_df is not None:
+        _print_class_distribution("DE Validation", de_val_df)
+
+    # Build NLI datasets per language with non-overlapping tweet_ids.
+    en_train_ds = dataframe_to_nli_dataset(en_train_df, "en", nli_train_mode=cfg.nli_train_mode, tweet_id_offset=0)
+    de_train_offset = len(en_train_df) + 10
+    de_train_ds = dataframe_to_nli_dataset(de_train_df, "de", nli_train_mode=cfg.nli_train_mode, tweet_id_offset=de_train_offset)
+
+    en_val_ds = dataframe_to_nli_dataset(en_val_df, "en", nli_train_mode=cfg.nli_train_mode) if en_val_df is not None else None
+    de_val_ds = dataframe_to_nli_dataset(de_val_df, "de", nli_train_mode=cfg.nli_train_mode) if de_val_df is not None else None
+
+    from datasets import concatenate_datasets
+    train_ds = concatenate_datasets([en_train_ds, de_train_ds]).shuffle(seed=cfg.seed)
+
+    # Use DE val set as the primary HF eval_dataset (DE-priority); we still log EN tweet metrics via callback.
+    primary_val_ds = de_val_ds if de_val_ds is not None else en_val_ds
+
+    ds_dict = DatasetDict({"train": train_ds, "validation": primary_val_ds}) if primary_val_ds else DatasetDict({"train": train_ds})
+    tokenized = ds_dict.map(
+        lambda ex: tokenize_fn(ex, tokenizer),
+        batched=True,
+        remove_columns=ds_dict["train"].column_names,
+    )
+    num_labels = len(NLI_LABEL2ID)
+
+    model = AutoModelForSequenceClassification.from_pretrained(cfg.model_name, num_labels=num_labels)
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+    # Use sample_weight for positives = avg of EN and DE positive weights; DE lang weight is applied separately in compute_loss.
+    positive_sample_weight = float((cfg.en_positive_sample_weight + cfg.de_positive_sample_weight) / 2.0)
+
+    def compute_loss(model, inputs, return_outputs=False, num_items_in_batch=None):
+        labels = inputs.pop("labels", None)
+        target_cls = inputs.pop("target_cls", None)
+        hyp_cls = inputs.pop("hyp_cls", None)
+        tweet_id = inputs.pop("tweet_id", None)
+        lang_id = inputs.pop("lang_id", None)
+        if labels is None:
+            raise ValueError("'labels' missing in batch")
+        outputs = model(**inputs)
+        logits = outputs.logits
+        loss_fct = torch.nn.CrossEntropyLoss(reduction="none")
+        sample_losses = loss_fct(logits.view(-1, num_labels), labels.view(-1))
+
+        weights = torch.ones_like(sample_losses)
+        if target_cls is not None and positive_sample_weight != 1.0:
+            pos_mask = target_cls.view(-1).to(weights.device) == 1
+            weights = torch.where(pos_mask, weights * float(positive_sample_weight), weights)
+        if hyp_cls is not None and cfg.class_0_loss_weight != 1.0:
+            hyp0_mask = hyp_cls.view(-1).to(weights.device) == 0
+            weights = torch.where(hyp0_mask, weights * float(cfg.class_0_loss_weight), weights)
+        if lang_id is not None and cfg.de_lang_loss_weight != 1.0:
+            de_mask = lang_id.view(-1).to(weights.device) == 1
+            weights = torch.where(de_mask, weights * float(cfg.de_lang_loss_weight), weights)
+
+        ce_loss = (sample_losses * weights).sum() / weights.sum().clamp(min=1.0)
+
+        loss = ce_loss
+        if (
+            cfg.tweet_level_loss_weight > 0.0
+            and target_cls is not None
+            and hyp_cls is not None
+            and tweet_id is not None
+        ):
+            entail_logits = logits[:, NLI_LABEL2ID["entailment"]]
+            tweet_ids = tweet_id.view(-1).to(logits.device)
+            hyp_classes = hyp_cls.view(-1).to(logits.device)
+            tweet_targets = target_cls.view(-1).to(logits.device).float()
+            unique_tweet_ids = torch.unique(tweet_ids)
+            tweet_margins: list[torch.Tensor] = []
+            tweet_labels: list[torch.Tensor] = []
+            neg_inf = torch.tensor(-1e4, device=logits.device)
+            for tid in unique_tweet_ids:
+                tweet_mask = tweet_ids == tid
+                if not torch.any(tweet_mask):
+                    continue
+                tweet_entail = entail_logits[tweet_mask]
+                tweet_hyp = hyp_classes[tweet_mask]
+                label = tweet_targets[tweet_mask][0]
+                pos_mask = tweet_hyp == 1
+                neg_mask = tweet_hyp == 0
+                pos_logit = torch.max(tweet_entail[pos_mask]) if torch.any(pos_mask) else neg_inf
+                neg_logit = torch.max(tweet_entail[neg_mask]) if torch.any(neg_mask) else neg_inf
+                margin = pos_logit - neg_logit
+                tweet_margins.append(margin)
+                tweet_labels.append(label)
+            if tweet_margins:
+                margin_tensor = torch.stack(tweet_margins)
+                label_tensor = torch.stack(tweet_labels)
+                tweet_loss = torch.nn.functional.binary_cross_entropy_with_logits(
+                    margin_tensor - float(cfg.tweet_level_margin), label_tensor
+                )
+                loss = ce_loss + float(cfg.tweet_level_loss_weight) * tweet_loss
+
+        return (loss, outputs) if return_outputs else loss
+
+    args = TrainingArguments(
+        output_dir=cfg.output_dir,
+        learning_rate=cfg.lr,
+        per_device_train_batch_size=cfg.batch_size,
+        per_device_eval_batch_size=cfg.batch_size,
+        gradient_accumulation_steps=cfg.gradient_accumulation_steps,
+        num_train_epochs=cfg.epochs,
+        weight_decay=cfg.weight_decay,
+        warmup_ratio=cfg.warmup_ratio,
+        eval_strategy="steps" if primary_val_ds else "no",
+        save_strategy="steps" if primary_val_ds else "no",
+        logging_steps=100,
+        save_steps=300,
+        eval_steps=300,
+        load_best_model_at_end=True if primary_val_ds else False,
+        metric_for_best_model="tweet_f1_de" if cfg.joint_eval_lang_for_best == "de" else "tweet_f1_en",
+        greater_is_better=True,
+        save_total_limit=10,
+        seed=cfg.seed,
+        report_to=[],
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=tokenized["train"],
+        eval_dataset=tokenized["validation"] if primary_val_ds else None,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics if primary_val_ds else None,
+    )
+    trainer.compute_loss = compute_loss
+
+    if primary_val_ds:
+        trainer.add_callback(JointTweetLevelCheckpointEvalCallback(
+            en_val_df=en_val_df, de_val_df=de_val_df, tokenizer=tokenizer, cfg=cfg,
+        ))
+        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=5))
+
+    trainer.train()
+    best_dir = args.output_dir
+    trainer.save_model(best_dir)
+    tokenizer.save_pretrained(best_dir)
+
+    # Per-language threshold calibration: save default config bound to DE,
+    # plus an EN-specific config in the same checkpoint dir.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    for lang_code, val_df_l in [("en", en_val_df), ("de", de_val_df)]:
+        if val_df_l is None or len(val_df_l) == 0:
+            continue
+        print(f"\nCalibrating {lang_code.upper()} positive decision threshold on validation tweets...")
+        val_texts_l = [str(x) for x in val_df_l["Text"].tolist()]
+        val_labels_l = [int(x) for x in val_df_l["Biased"].tolist()]
+        thr_res = tune_positive_margin_threshold(
+            texts=val_texts_l, true_labels=val_labels_l, lang=lang_code,
+            tokenizer=tokenizer, model=trainer.model, device=device,
+            objective=cfg.threshold_objective,
+            threshold_min=cfg.threshold_search_min, threshold_max=cfg.threshold_search_max,
+            min_precision=cfg.threshold_min_precision,
+            contradiction_weight=cfg.contradiction_weight,
+            class_0_weight=cfg.class_0_weight, score_mode=cfg.score_mode,
+            nli_train_mode=cfg.nli_train_mode,
+            progress_label=f"{lang_code.upper()} threshold calibration",
+        )
+        # Default config = primary language for best metric.
+        if lang_code == cfg.joint_eval_lang_for_best:
+            save_decision_config(
+                ckpt_dir=best_dir,
+                positive_margin_threshold=thr_res["threshold"],
+                contradiction_weight=cfg.contradiction_weight,
+                score_mode=cfg.score_mode, nli_train_mode=cfg.nli_train_mode,
+                objective=cfg.threshold_objective, validation_metrics=thr_res,
+            )
+        # Always also write per-language config for inference flexibility.
+        per_lang_path = os.path.join(best_dir, f"decision_config_{lang_code}.json")
+        with open(per_lang_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "positive_margin_threshold": float(thr_res["threshold"]),
+                "contradiction_weight": float(cfg.contradiction_weight),
+                "score_mode": str(cfg.score_mode),
+                "nli_train_mode": str(cfg.nli_train_mode),
+                "objective": cfg.threshold_objective,
+                "lang": lang_code,
+                "validation_metrics": thr_res,
+            }, f, indent=2, ensure_ascii=True)
+        print(
+            f"{lang_code.upper()} threshold: thr={thr_res['threshold']:.4f} "
+            f"p={thr_res['precision']:.4f} r={thr_res['recall']:.4f} f1={thr_res['f1']:.4f} "
+            f"constraint_satisfied={thr_res.get('constraint_satisfied', True)}"
+        )
+
+    return best_dir, en_test_csv, de_test_csv
+
+
+class JointTweetLevelCheckpointEvalCallback(TrainerCallback):
+    """Tweet-level validation per language during joint training."""
+
+    def __init__(self, en_val_df, de_val_df, tokenizer, cfg: Config):
+        self.en_texts = [str(x) for x in en_val_df["Text"].tolist()] if en_val_df is not None else []
+        self.en_labels = [int(x) for x in en_val_df["Biased"].tolist()] if en_val_df is not None else []
+        self.de_texts = [str(x) for x in de_val_df["Text"].tolist()] if de_val_df is not None else []
+        self.de_labels = [int(x) for x in de_val_df["Biased"].tolist()] if de_val_df is not None else []
+        self.tokenizer = tokenizer
+        self.cfg = cfg
+
+    def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+        model = kwargs.get("model")
+        output_dir = args.output_dir or self.cfg.output_dir
+        if model is None:
+            return
+        sink = metrics if isinstance(metrics, dict) else kwargs.get("metrics")
+        if not isinstance(sink, dict):
+            sink = None
+
+        for lang_code, texts, labels in [("en", self.en_texts, self.en_labels), ("de", self.de_texts, self.de_labels)]:
+            if not texts:
+                continue
+            preds = predict_texts_with_threshold(
+                texts=texts, lang=lang_code, tokenizer=self.tokenizer, model=model,
+                device=model.device,
+                positive_margin_threshold=DEFAULT_POSITIVE_MARGIN_THRESHOLD,
+                contradiction_weight=self.cfg.contradiction_weight,
+                class_0_weight=self.cfg.class_0_weight,
+                score_mode=self.cfg.score_mode,
+                nli_train_mode=self.cfg.nli_train_mode,
+                progress_label=f"Joint tweet-level {lang_code.upper()} step {state.global_step}",
+            )
+            m = _tweet_metrics(labels, preds)
+            print(
+                f"[{lang_code.upper()}] step={state.global_step} "
+                f"p={m['precision']:.4f} r={m['recall']:.4f} f1={m['f1']:.4f}"
+            )
+            if sink is not None:
+                sink[f"eval_tweet_precision_{lang_code}"] = float(m["precision"])
+                sink[f"eval_tweet_recall_{lang_code}"] = float(m["recall"])
+                sink[f"eval_tweet_f1_{lang_code}"] = float(m["f1"])
+                sink[f"tweet_f1_{lang_code}"] = float(m["f1"])
+            payload = {
+                "checkpoint": os.path.join(output_dir, f"checkpoint-{state.global_step}"),
+                "global_step": int(state.global_step),
+                "epoch": float(state.epoch) if state.epoch is not None else -1.0,
+                "lang": lang_code,
+                "precision": float(m["precision"]),
+                "recall": float(m["recall"]),
+                "f1": float(m["f1"]),
+            }
+            _append_tweet_level_checkpoint_metrics(output_dir, payload)
+        return
+
+
 if __name__ == "__main__":
     import argparse
     from .evaluate import evaluate_with_analysis
@@ -669,6 +1031,30 @@ if __name__ == "__main__":
         help="Path to German validation CSV (optional if --val_size is used)",
     )
     parser.add_argument("--model_name", type=str, default=None)
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="Number of training epochs per stage.",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=None,
+        help="Learning rate.",
+    )
+    parser.add_argument(
+        "--batch_size",
+        type=int,
+        default=None,
+        help="Per-device batch size.",
+    )
+    parser.add_argument(
+        "--class_0_loss_weight",
+        type=float,
+        default=None,
+        help="CE-loss weight for class-0 hypothesis rows (matches decision-time class_0_weight).",
+    )
     parser.add_argument(
         "--val_size",
         type=float,
@@ -775,6 +1161,18 @@ if __name__ == "__main__":
         help="Only score the latest K checkpoint-* directories from current run (0 disables limit).",
     )
     parser.add_argument(
+        "--tweet_level_loss_weight",
+        type=float,
+        default=None,
+        help="Auxiliary tweet-level margin loss weight added to NLI CE loss (0 disables).",
+    )
+    parser.add_argument(
+        "--tweet_level_margin",
+        type=float,
+        default=None,
+        help="Bias term for tweet-level margin loss; positive values require larger margin for class 1.",
+    )
+    parser.add_argument(
         "--class_0_weight",
         type=float,
         default=None,
@@ -818,6 +1216,30 @@ if __name__ == "__main__":
         help="Output directory used when --de_only is enabled.",
     )
     parser.add_argument(
+        "--joint_train",
+        action="store_true",
+        help="Train EN and DE jointly in a single stage (instead of EN -> DE fine-tuning).",
+    )
+    parser.add_argument(
+        "--joint_output_dir",
+        type=str,
+        default=os.path.join("checkpoints", "xlmr-nli", "joint"),
+        help="Output directory used when --joint_train is enabled.",
+    )
+    parser.add_argument(
+        "--de_lang_loss_weight",
+        type=float,
+        default=None,
+        help="Loss multiplier for DE rows in joint training (defaults to 2.0).",
+    )
+    parser.add_argument(
+        "--joint_eval_lang_for_best",
+        type=str,
+        default=None,
+        choices=["en", "de"],
+        help="Which language tweet-F1 drives best-model selection in joint training.",
+    )
+    parser.add_argument(
         "--log_file",
         type=str,
         default=None,
@@ -832,6 +1254,9 @@ if __name__ == "__main__":
 
     cfg_overrides = {
         "model_name": args_.model_name,
+        "epochs": args_.epochs,
+        "lr": args_.lr,
+        "batch_size": args_.batch_size,
         "pos_oversample_factor": args_.pos_oversample_factor,
         "positive_sample_weight": args_.positive_sample_weight,
         "en_pos_oversample_factor": args_.en_pos_oversample_factor,
@@ -846,19 +1271,58 @@ if __name__ == "__main__":
         "score_mode": args_.score_mode,
         "nli_train_mode": args_.nli_train_mode,
         "class_0_weight": args_.class_0_weight,
+        "class_0_loss_weight": args_.class_0_loss_weight,
         "model_selection_objective": args_.model_selection_objective,
         "model_selection_min_precision": args_.model_selection_min_precision,
         "model_selection_last_k_checkpoints": args_.model_selection_last_k_checkpoints,
+        "tweet_level_loss_weight": args_.tweet_level_loss_weight,
+        "tweet_level_margin": args_.tweet_level_margin,
+        "de_lang_loss_weight": args_.de_lang_loss_weight,
+        "joint_eval_lang_for_best": args_.joint_eval_lang_for_best,
     }
     cfg = Config(**{k: v for k, v in cfg_overrides.items() if v is not None})
 
-    default_log_dir = args_.de_only_output_dir if args_.de_only else cfg.output_dir
+    default_log_dir = args_.de_only_output_dir if args_.de_only else (args_.joint_output_dir if args_.joint_train else cfg.output_dir)
     log_file = args_.log_file if args_.log_file else os.path.join(default_log_dir, "train.log")
 
     with redirect_output_to_log(log_file):
         print(f"Writing training/evaluation logs to: {os.path.abspath(log_file)}")
 
-        if args_.de_only:
+        if args_.joint_train:
+            print("\n" + "=" * 80)
+            print("JOINT EN+DE TRAINING (single stage)")
+            print("=" * 80)
+            cfg.output_dir = args_.joint_output_dir
+            joint_out, en_test_csv, de_test_csv = train_joint_stage(
+                en_train_csv=args_.en_train,
+                de_train_csv=args_.de_train,
+                cfg=cfg,
+                val_size=args_.val_size,
+                hold_test_size=args_.test_size,
+            )
+            if not args_.skip_evaluation:
+                print("\n" + "=" * 80)
+                print("FINAL EVALUATION ON HELD-OUT TEST SETS (JOINT)")
+                print("=" * 80)
+                if en_test_csv is not None:
+                    print("\n" + "-" * 80)
+                    print("Evaluating EN test set...")
+                    print("-" * 80)
+                    evaluate_with_analysis(
+                        joint_out, en_test_csv, "en",
+                        show_examples=args_.show_examples,
+                        class_0_weight=cfg.class_0_weight,
+                    )
+                if de_test_csv is not None:
+                    print("\n" + "-" * 80)
+                    print("Evaluating DE test set...")
+                    print("-" * 80)
+                    evaluate_with_analysis(
+                        joint_out, de_test_csv, "de",
+                        show_examples=args_.show_examples,
+                        class_0_weight=cfg.class_0_weight,
+                    )
+        elif args_.de_only:
             print("\n" + "=" * 80)
             print("GERMAN TRAINING (DE-ONLY, NO ENGLISH PRETRAINING)")
             print("=" * 80)

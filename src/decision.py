@@ -63,7 +63,6 @@ def score_text(
     scores: Dict[str, float] = {}
     for cls in HYPOTHESES.keys():
         class_scores: list[float] = []
-        entailment_scores: list[float] = []
         for hyp in hypotheses_for_class(cls, lang):
             inputs = tokenizer(text, hyp, return_tensors="pt", truncation=True)
             inputs = _to_device(inputs, device)
@@ -79,24 +78,16 @@ def score_text(
                     score_mode=score_mode,
                 )
             )
-            entailment_scores.append(entail_prob)
 
         if not class_scores:
             scores[cls] = 0.0
             continue
 
-        if cls == "1":
-            # Requested behavior: class 1 score is the maximum hypothesis score.
-            scores[cls] = float(max(class_scores))
-        elif cls == "0":
-            # Requested behavior: class 0 score is mean of all entailment scores.
-            scores[cls] = float(sum(entailment_scores) / len(entailment_scores))
-        else:
-            # Fallback for potential future classes.
-            top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(class_scores))
-            top_scores = sorted(class_scores, reverse=True)[:top_k]
-            scores[cls] = float(sum(top_scores) / len(top_scores))
-    # Apply class_0_weight dampening
+        # Aggregate consistently for both classes: take the maximum hypothesis score.
+        # Using max for class 0 too prevents weak class-0 hypotheses from being averaged out
+        # by strong ones (which previously caused score_0 to dominate score_1).
+        scores[cls] = float(max(class_scores))
+    # Apply class_0_weight dampening on the final aggregated class-0 score.
     if "0" in scores:
         scores["0"] = scores["0"] * float(class_0_weight)
     return scores
@@ -161,7 +152,6 @@ def score_text_detailed(
     for cls in HYPOTHESES.keys():
         hyps = hypotheses_for_class(cls, lang)
         class_scores: list[tuple[str, float]] = []
-        entailment_scores: list[float] = []
         for hyp in hyps:
             inputs = tokenizer(text, hyp, return_tensors="pt", truncation=True)
             inputs = _to_device(inputs, device)
@@ -175,10 +165,7 @@ def score_text_detailed(
                 contradiction_weight=contradiction_weight,
                 score_mode=score_mode,
             )
-            # For class 0, detailed listing should reflect entailment scores used in aggregation.
-            display_score = entail_prob if cls == "0" else score
-            entailment_scores.append(entail_prob)
-            class_scores.append((hyp, display_score))
+            class_scores.append((hyp, score))
 
         if not class_scores:
             scores[cls] = 0.0
@@ -187,15 +174,8 @@ def score_text_detailed(
 
         sorted_hyps = sorted(class_scores, key=lambda x: x[1], reverse=True)
         hyp_scores[cls] = sorted_hyps
-
-        if cls == "1":
-            scores[cls] = float(max([s for _, s in sorted_hyps]))
-        elif cls == "0":
-            scores[cls] = float(sum(entailment_scores) / len(entailment_scores))
-        else:
-            top_k = min(DEFAULT_HYPOTHESIS_AGGREGATION_TOP_K, len(sorted_hyps))
-            top_scores = [s for _, s in sorted_hyps[:top_k]]
-            scores[cls] = float(sum(top_scores) / len(top_scores))
+        # Same aggregation as score_text: max over hypotheses for both classes.
+        scores[cls] = float(max(s for _, s in sorted_hyps))
 
     # Skip class-0 hypotheses entirely in class1_only mode
     mode = str(nli_train_mode).strip().lower()

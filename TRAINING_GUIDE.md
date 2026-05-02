@@ -1,276 +1,327 @@
-# Antisemitism Classifier - Training & Evaluation Guide
+# Antisemitism Classifier — Training & Evaluation Guide
 
-## Overview
+End-to-end pipeline for binary tweet-level antisemitism detection (`Biased ∈ {0,1}`)
+based on an NLI-formulation: each tweet is paired with a set of natural-language
+hypotheses, the model outputs entailment / neutral / contradiction probabilities,
+and a margin-based decision rule produces the final label.
 
-This guide describes the current end-to-end training pipeline implemented in `src/train.py` and the tweet-level decision logic in `src/decision.py`.
+Backbone: `xlm-roberta-base` (3-class NLI head). Multilingual: EN + DE.
 
-Core design goals:
-- Train an NLI model for binary tweet-level antisemitism detection (`0`/`1`).
-- Select checkpoints using tweet-level metrics, not only pair-level NLI loss.
-- Tune a margin threshold on validation tweets with configurable precision constraints.
-- Keep EN and DE class-imbalance handling separate.
+---
 
-Pipeline modes:
-- Two-stage mode (default):
-    - Stage 1: English training (`en`)
-    - Stage 2: German fine-tuning (`de`) from Stage 1 output
-- German-only mode:
-    - Single stage on DE data (`--de_only`)
+## 1. Pipeline Modes
 
-## Data Flow
+The CLI supports three training modes. Pick exactly one.
 
-### 1. Tweet-level split before NLI expansion
+| Mode | Flag | What it does | Output dir |
+|---|---|---|---|
+| Two-stage (legacy) | (default) | Train on EN, then fine-tune on DE | `checkpoints/xlmr-nli/` (EN), `checkpoints/xlmr-nli/de_ft/` (DE) |
+| German only | `--de_only` | Single stage on DE | `checkpoints/xlmr-nli/de_only/` |
+| **Joint EN+DE** (recommended) | `--joint_train` | Single stage on EN + DE concatenated | `checkpoints/xlmr-nli/joint/` |
 
-Splits are created on original tweet rows before premise-hypothesis expansion.
+The two-stage mode systematically over-writes the EN-trained representation during DE fine-tuning, which hurts DE performance because DE has very few positives (~4 %). Joint training keeps both languages' gradients flowing into the same model and consistently delivers the best DE F1 in our runs.
 
-Default behavior:
-- `--test_size 0.15`: creates a held-out test split and writes:
-    - `*_test_holdout.csv`
-    - `*_train_val.csv`
-- `--val_size 0.15`: creates validation split from train/val pool.
+---
 
-Dynamic split detail:
-- If both `test_size` and `val_size` are used, validation size is adjusted relative to the remaining train/val pool:
-    - `relative_val_size = val_size / (1 - test_size)`
+## 2. Data Pipeline
 
-### 2. NLI expansion and tokenization
+### 2.1 Tweet-level splits (leakage-free)
 
-Each tweet is expanded into NLI examples using hypotheses per class and language from `src/hypotheses.py`.
+Splits happen on raw tweet rows BEFORE NLI expansion, otherwise a single tweet's pair-rows would leak into both train and val.
 
-Tokenized fields include:
-- model inputs (`input_ids`, `attention_mask`, ...)
-- `labels` (NLI class)
-- `target_cls` (tweet class `0/1`, used for weighted loss)
-- `hyp_cls`
+- `--test_size 0.15` — held-out test set (never seen during training/threshold calibration). Saved as `*_test_holdout.csv` next to the source CSV.
+- `--val_size 0.15` — validation split from the remaining train pool. Adjusted to `val_size / (1 - test_size)` so the absolute fraction matches `val_size`.
+- Stratified by `Biased` to preserve class balance in each split.
 
-## Class Imbalance Handling
+### 2.2 NLI expansion ([`src/dataset.py`](src/dataset.py))
 
-The pipeline uses language-specific settings during training stage execution.
+For each tweet, the row is expanded into one NLI pair `(premise=text, hypothesis=h)` per hypothesis from [`src/hypotheses.py`](src/hypotheses.py).
 
-### Dynamic value determination by stage language
+Hypothesis classes:
+- Class `1` (antisemitic): 6 hypotheses each in DE/EN, covering dehumanization, conspiracy, collective blame, Israel delegitimization/Nazi-equation, calls for violence, and Holocaust denial.
+- Class `0` (non-antisemitic): 3 hypotheses each, covering factual statements, government criticism without anti-Jewish framing, and respectful discussion of Jewish life.
 
-In `train_stage(...)`, values are selected by `lang`:
-- For `en`:
-    - oversampling factor = `en_pos_oversample_factor`
-    - positive weight = `en_positive_sample_weight`
-- For `de`:
-    - oversampling factor = `de_pos_oversample_factor`
-    - positive weight = `de_positive_sample_weight`
+`nli_label` per pair is determined by `--nli_train_mode`:
 
-Defaults:
-- `en_pos_oversample_factor = 1.5`
-- `de_pos_oversample_factor = 2.0`
-- `en_positive_sample_weight = 3.0`
-- `de_positive_sample_weight = 10.0`
+| Mode | Tweet=0, Hyp class=1 | Tweet=1, Hyp class=0 | Tweet=cls, Hyp=cls |
+|---|---|---|---|
+| `both_classes_contradiction` (default) | contradiction | contradiction | entailment |
+| `both_classes_asymmetric_neutral` (recommended) | **neutral** | contradiction | entailment |
+| `class1_only` | contradiction | (skipped) | entailment |
 
-Mechanisms:
-- Oversampling (data-level): duplicates positive tweets in training data.
-- Weighted loss (loss-level): multiplies CE loss for samples with `target_cls == 1`.
+Asymmetric neutral works best in practice: a non-antisemitic tweet does not actively contradict the hypothesis "the text dehumanizes Jews" — it is simply unrelated. Training that as `neutral` matches the semantics and prevents the model from being pushed to contradict everything.
 
-Note:
-- Legacy CLI args `--pos_oversample_factor` and `--positive_sample_weight` still exist for compatibility and are stored in config, but stage execution currently uses the EN/DE-specific values above.
+Each NLI row carries:
+- `labels` (NLI class id)
+- `target_cls` (tweet class 0/1) — for positive-tweet upweighting
+- `hyp_cls` (hypothesis class 0/1) — for class-0 hypothesis dampening
+- `tweet_id` — for tweet-level margin loss
+- `lang_id` (0=EN, 1=DE) — for joint-training language weighting
 
-## Training Configuration
+---
 
-Fixed defaults from `Config`:
-- `model_name = xlm-roberta-base`
-- `lr = 2e-5`
-- `epochs = 8`
-- `batch_size = 16`
-- `gradient_accumulation_steps = 8`
-- `weight_decay = 0.01`
-- `warmup_ratio = 0.06`
-- `seed = 42`
+## 3. Loss & Fine-tuning
 
-Trainer runtime settings:
-- `eval_strategy = steps` (if validation exists)
-- `save_strategy = steps` (if validation exists)
-- `eval_steps = 200`
-- `save_steps = 200`
-- `logging_steps = 100`
-- `save_total_limit = 5`
-- `load_best_model_at_end = True` (if validation exists)
-- HF best model criterion:
-    - `metric_for_best_model = eval_loss`
-    - `greater_is_better = False`
+The standard HuggingFace `Trainer` is used with a custom `compute_loss` that combines two terms.
 
-Early stopping:
-- Enabled when validation exists with `EarlyStoppingCallback(early_stopping_patience=3)`.
+### 3.1 Weighted cross-entropy (per NLI pair)
 
-## Dynamic Checkpoint Candidate Selection
+Per-sample weight (multiplied together):
 
-After `trainer.train()` finishes, checkpoint selection for final model uses tweet-level metrics:
+```
+w = 1.0
+  * positive_sample_weight   if target_cls == 1
+  * class_0_loss_weight      if hyp_cls == 0
+  * de_lang_loss_weight      if lang_id == 1   (joint mode only)
+```
 
-1. Collect current-run checkpoints dynamically via directory modification time:
-- Include `checkpoint-*` directories in output dir where `mtime >= run_start_ts - 1.0`.
+Then `ce_loss = sum(sample_loss * w) / sum(w)`.
 
-2. Apply candidate limiting:
-- Keep latest K current-run checkpoints (`model_selection_last_k_checkpoints`, default `3`).
-- If `K=0`, no limit is applied.
+Why three factors:
+- **Positive upweighting** counters the ~4 % DE positive rate.
+- **Class-0 hypothesis dampening** mirrors the decision-time `class_0_weight` so training and inference optimize the same signal.
+- **DE language weight** (joint mode) prevents the larger EN dataset from dominating gradients.
 
-3. Safety candidate:
-- Add HF best checkpoint (`trainer.state.best_model_checkpoint`) if available.
+### 3.2 Tweet-level margin loss (auxiliary)
 
-4. Fallback behavior:
-- If no run candidates are detected, the selector falls back to all available candidate directories in output dir (including root model dir when present).
+Independent of CE, a margin objective enforces the actual decision rule on raw entailment logits within each batch's tweet group:
 
-### Tweet-level checkpoint objective
+```
+For each tweet in batch:
+  pos_logit = max(entail_logits over rows with hyp_cls==1)
+  neg_logit = max(entail_logits over rows with hyp_cls==0)
+  margin    = pos_logit - neg_logit
+loss_tweet = BCEWithLogits(margin - tweet_level_margin, tweet_label)
 
-Supported objectives:
-- `f1`
-- `recall`
-- `recall_at_precision`
+total_loss = ce_loss + tweet_level_loss_weight * loss_tweet
+```
 
-Ranking logic:
-- `f1`: rank by `(f1, recall, precision)`
-- `recall`: rank by `(recall, f1, precision)`
-- `recall_at_precision`: rank by `(constraint, recall, f1, precision)` where `constraint = 1 if precision >= min_precision else 0`
+This pushes the model to make `pos_logit > neg_logit` whenever the tweet is positive, directly aligning the training objective with the inference-time decision rule. We use raw logits (not softmax probabilities) so gradients are well-scaled.
 
-Default selection objective settings (effective CLI defaults):
-- `--model_selection_objective recall_at_precision`
-- `--model_selection_min_precision 0.20`
+Default `tweet_level_loss_weight = 0.2`. Set to `0` to disable.
 
-## Decision Scoring and Threshold Calibration
+### 3.3 Optimizer & schedule
 
-### Per-class score aggregation (dynamic over hypotheses)
+Defaults from `Config`:
 
-For each class (`0`, `1`):
-- Compute entailment probability for each hypothesis.
-- Sort class hypothesis scores descending.
-- Aggregate with top-k mean (`k=2`, or fewer if fewer hypotheses exist).
+| Param | Value |
+|---|---|
+| `lr` | `2e-5` |
+| `epochs` | `4` |
+| `batch_size` | `16` |
+| `gradient_accumulation_steps` | `8` (effective batch 128) |
+| `weight_decay` | `0.01` |
+| `warmup_ratio` | `0.06` |
+| `seed` | `42` |
+| `eval_steps` / `save_steps` | `300` |
+| `save_total_limit` | `10` |
 
-This replaces strict max aggregation and reduces one-hypothesis spikes.
+### 3.4 Best-checkpoint selection
 
-### Threshold tuning
+Every `eval_steps`, a callback runs **tweet-level** scoring on the validation set (full decision rule, including hypotheses + margin computation, **at threshold 0.0**) and exposes `tweet_precision`, `tweet_recall`, `tweet_f1` to the trainer.
 
-Prediction rule:
-- margin = `score_1 - score_0`
-- predict class `1` iff `margin >= threshold`
+The best checkpoint is selected by:
+- Two-stage / DE-only: `metric_for_best_model="tweet_f1"`
+- Joint: `metric_for_best_model="tweet_f1_de"` (or `tweet_f1_en` via `--joint_eval_lang_for_best en`)
 
-Threshold search defaults:
-- `threshold_min = -0.5`
-- `threshold_max = 0.5`
-- `threshold_steps = 401`
+Early stopping: `EarlyStoppingCallback(patience=5)` — counts evaluations without improvement on the chosen metric.
 
-Dynamic threshold objective:
-- `--threshold_objective` in `{f1, recall, recall_at_precision}`
-- `--threshold_min_precision` used when objective is `recall_at_precision`
+After training, in two-stage mode an additional explicit checkpoint sweep ([`_select_best_checkpoint_by_tweet_objective`](src/train.py)) reranks the last K candidates by `model_selection_objective` (`f1`, `recall`, or `recall_at_precision`) on the validation set; this is largely redundant with `load_best_model_at_end` but acts as a safety net.
 
-Fallback behavior:
-- If no threshold satisfies precision constraint, fallback returns recall-optimal threshold and marks `constraint_satisfied = false`.
+---
 
-Saved artifact:
-- `decision_config.json` in checkpoint dir stores selected threshold and validation metrics.
+## 4. Decision Rule (How a Label Is Computed)
 
-## Evaluation Flow
+Given a fine-tuned model, predicting the label for one tweet works as follows ([`src/decision.py`](src/decision.py)).
 
-If `--skip_evaluation` is not set:
-- Two-stage mode evaluates EN and DE held-out sets.
-- DE-only mode evaluates only DE held-out set.
+### 4.1 Per-hypothesis score
 
-Evaluation script (`src.evaluate`) reports:
-- Accuracy
-- Positive precision/recall/F1
-- Confusion matrix
-- Error examples (TP/FP/FN samples)
+For each hypothesis `h` of class `c ∈ {0,1}`:
+1. Tokenize `(premise=text, hypothesis=h)`, run through model.
+2. Softmax over the 3 NLI classes → `(p_contradiction, p_neutral, p_entailment)`.
+3. Hypothesis score:
+   - `score_mode = "entailment_only"` (default): `s = p_entailment`
+   - `score_mode = "entailment_minus_contradiction"`: `s = p_entailment - contradiction_weight * p_contradiction`
 
-## CLI Reference (Current)
+### 4.2 Per-class aggregation
 
-### Required inputs
-- `--de_train`
-- `--en_train` required unless `--de_only` is set
+Both classes use **max** over their hypotheses (uniform aggregation prevents class 0 from dominating via averaging):
 
-### Data and split
-- `--en_train`
-- `--de_train`
-- `--en_val`
-- `--de_val`
-- `--val_size` (default `0.15`)
-- `--test_size` (default `0.15`)
+```
+score_1 = max_h s(h)  for h in class-1 hypotheses
+score_0 = max_h s(h)  for h in class-0 hypotheses
+score_0 = score_0 * class_0_weight     # dampening (default 0.7)
+```
 
-### Base model and stage mode
-- `--model_name` (default `xlm-roberta-base`)
-- `--de_only`
-- `--de_only_output_dir` (default `checkpoints/xlmr-nli/de_only`)
+In `class1_only` mode `score_0` is fixed at 0.
 
-### Imbalance controls
-- Legacy/general:
-    - `--pos_oversample_factor` (default `5.0`)
-    - `--positive_sample_weight` (default `5.0`)
-- Stage-specific (actively used by current train loop):
-    - `--en_pos_oversample_factor` (default `1.5`)
-    - `--de_pos_oversample_factor` (default `2.0`)
-    - `--en_positive_sample_weight` (default `3.0`)
-    - `--de_positive_sample_weight` (default `10.0`)
+### 4.3 Margin and threshold
+
+```
+margin = score_1 - score_0
+prediction = 1 if margin >= positive_margin_threshold else 0
+```
+
+The threshold is **not** zero by default — it is calibrated per stage on the validation set (see Section 5).
+
+In joint mode, two threshold files are written (`decision_config_en.json` and `decision_config_de.json`) so inference can use the language-appropriate threshold; the default `decision_config.json` mirrors the language chosen via `--joint_eval_lang_for_best`.
+
+---
+
+## 5. Threshold Calibration
+
+After training, [`tune_positive_margin_threshold`](src/decision.py) runs on the validation tweets:
+
+1. Compute the margin for every validation tweet using the trained model.
+2. Sweep `threshold_steps=401` candidate thresholds in `[threshold_search_min, threshold_search_max]` (defaults `-0.2` to `0.8`).
+3. For each candidate, compute `(precision, recall, f1)` and rank by `--threshold_objective`:
+   - `f1` → `(f1, recall, precision)`
+   - `recall` → `(recall, f1, precision)`
+   - `recall_at_precision` → `(constraint, recall, f1, precision)` where `constraint = (precision >= threshold_min_precision)`
+4. Save the winning threshold + metrics to `decision_config.json` in the checkpoint dir.
+
+If no threshold satisfies the precision constraint, the calibrator returns the recall-optimal fallback and marks `constraint_satisfied = false` — check the log if you see odd behavior.
+
+Defaults (deliberate, to avoid threshold collapse to extreme negative values):
+- `threshold_objective = "f1"` (no constraint pressure to over-trigger)
+- `threshold_min_precision = 0.5`
+- `threshold_search_min = -0.2`, `threshold_search_max = 0.8`
+
+---
+
+## 6. Class Imbalance Handling
+
+Defaults assume EN ~17 % positives and DE ~4 % positives.
+
+| Param | EN default | DE default | Effect |
+|---|---|---|---|
+| `*_pos_oversample_factor` | 1.5 | 4.0 | Replicates positive rows in train data |
+| `*_positive_sample_weight` | 1.5 | 2.5 | Loss multiplier for positive-tweet rows |
+| `class_0_weight` | 0.7 | 0.7 | Decision-time dampening for `score_0` |
+| `class_0_loss_weight` | 0.7 | 0.7 | CE loss dampening for class-0 hyp pairs (matches decision side) |
+| `de_lang_loss_weight` (joint) | — | 2.0 | Loss multiplier for DE rows in joint mode |
+
+Stacking too aggressive oversampling AND positive weights collapses precision; the current defaults are deliberately moderate.
+
+---
+
+## 7. CLI Reference
+
+### Required
+- `--de_train PATH` — always required
+- `--en_train PATH` — required unless `--de_only` is set
+
+### Mode selection
+- `--de_only` / `--de_only_output_dir DIR`
+- `--joint_train` / `--joint_output_dir DIR` / `--joint_eval_lang_for_best {en|de}`
+
+### Splits
+- `--val_size 0.15`, `--test_size 0.15`
+- `--en_val PATH`, `--de_val PATH` (only used if `--val_size` is omitted)
+
+### Model & training
+- `--model_name xlm-roberta-base`
+- `--epochs 4`, `--lr 2e-5`, `--batch_size 16`
+
+### Imbalance
+- `--en_pos_oversample_factor`, `--de_pos_oversample_factor`
+- `--en_positive_sample_weight`, `--de_positive_sample_weight`
+- `--class_0_weight 0.7`, `--class_0_loss_weight 0.7`
+- `--de_lang_loss_weight 2.0` (joint mode)
+- `--tweet_level_loss_weight 0.2`, `--tweet_level_margin 0.0`
+
+### NLI training mode
+- `--nli_train_mode {both_classes_contradiction | both_classes_asymmetric_neutral | class1_only}`
 
 ### Threshold calibration
-- `--threshold_objective` (`f1|recall|recall_at_precision`, default `recall_at_precision`)
-- `--threshold_min_precision` (default `0.20`)
-- `--threshold_search_min` (default `-0.5`)
-- `--threshold_search_max` (default `0.5`)
+- `--threshold_objective {f1|recall|recall_at_precision}`
+- `--threshold_min_precision`, `--threshold_search_min`, `--threshold_search_max`
 
-### Checkpoint model selection
-- `--model_selection_objective` (`f1|recall|recall_at_precision`, default `recall_at_precision`)
-- `--model_selection_min_precision` (default `0.20`)
-- `--model_selection_last_k_checkpoints` (default `3`, `0` = no K-limit)
+### Checkpoint selection (post-train sweep, two-stage / de_only)
+- `--model_selection_objective`, `--model_selection_min_precision`
+- `--model_selection_last_k_checkpoints`
 
-### Output and reporting
-- `--skip_evaluation`
-- `--show_examples` (default `10`)
+### Decision scoring
+- `--score_mode {entailment_only|entailment_minus_contradiction}`
+- `--contradiction_weight`
 
-## Recommended Commands
+### Misc
+- `--skip_evaluation`, `--show_examples 10`, `--log_file PATH`
 
-### Full EN -> DE pipeline
+---
 
-```bash
-C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --en_train data/en_cleaned.csv --de_train data/de_cleaned.csv --threshold_objective recall_at_precision --threshold_min_precision 0.20 --threshold_search_min -0.5 --threshold_search_max 0.5 --model_selection_objective recall_at_precision --model_selection_min_precision 0.20 --en_pos_oversample_factor 1.5 --de_pos_oversample_factor 2.0 --en_positive_sample_weight 3.0 --de_positive_sample_weight 10.0
+## 8. Recommended Commands
+
+### Joint EN+DE (recommended)
+
+```powershell
+python -m src.train `
+  --joint_train `
+  --en_train data/en_cleaned.csv `
+  --de_train data/de_cleaned.csv `
+  --nli_train_mode both_classes_asymmetric_neutral `
+  --epochs 4
 ```
 
-### Fast experiment (skip final evaluation)
+### Two-stage EN → DE (legacy)
 
-```bash
-C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --en_train data/en_cleaned.csv --de_train data/de_cleaned.csv --skip_evaluation
+```powershell
+python -m src.train `
+  --en_train data/en_cleaned.csv `
+  --de_train data/de_cleaned.csv `
+  --nli_train_mode both_classes_asymmetric_neutral `
+  --epochs 4
 ```
 
-### German-only baseline
+### German-only
 
-```bash
-C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --de_only --de_train data/de_cleaned.csv --de_only_output_dir checkpoints/xlmr-nli/de_only
+```powershell
+python -m src.train `
+  --de_only `
+  --de_train data/de_cleaned.csv `
+  --nli_train_mode both_classes_asymmetric_neutral `
+  --epochs 4
 ```
 
-### Manual evaluation
+### Manual evaluation of an existing checkpoint
 
-```bash
-C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.evaluate --checkpoint checkpoints/xlmr-nli/de_ft --test_data data/de_cleaned_test_holdout.csv --lang de --show_examples 10
+```powershell
+python -m src.evaluate `
+  --checkpoint checkpoints/xlmr-nli/joint `
+  --test_data data/de_cleaned_test_holdout.csv `
+  --lang de `
+  --show_examples 10
 ```
 
-## Practical Interpretation Notes
+---
 
-- Accuracy alone is not enough for imbalanced antisemitism detection.
-- Track positive precision and recall jointly.
-- Very negative thresholds push recall up and can explode false positives.
-- The precision-constrained objectives and threshold range bounds are the key controls for this trade-off.
+## 9. Outputs
 
-## Outputs and Artifacts
+Per training run the output dir contains:
 
-- Stage 1 model dir: `checkpoints/xlmr-nli/`
-- Stage 2 model dir: `checkpoints/xlmr-nli/de_ft/`
-- DE-only model dir: configurable via `--de_only_output_dir`
-- Holdout/train-val split CSVs: written next to source CSVs
-- Decision config: `decision_config.json` in each stage output dir
+| File | Purpose |
+|---|---|
+| `model.safetensors`, `config.json`, tokenizer files | Final selected checkpoint |
+| `checkpoint-*/` | Per-step intermediate checkpoints |
+| `decision_config.json` | Threshold + score config used by inference |
+| `decision_config_en.json`, `decision_config_de.json` (joint only) | Per-language threshold |
+| `tweet_level_checkpoint_metrics.jsonl` | One record per (checkpoint, lang) with tweet-level p/r/f1 |
+| `train.log` | Full stdout/stderr of the run |
 
-## Troubleshooting
+Inference loads `decision_config.json` (or a language-specific variant if available) and applies the decision rule from Section 4.
 
-- Training seems stuck:
-    - Wait for progress logs during checkpoint scoring and threshold calibration.
-    - These phases run full tweet-level scoring loops and can take time.
+---
 
-- Unexpected checkpoint selected:
-    - Check objective/min_precision settings.
-    - Check `model_selection_last_k_checkpoints` and fallback behavior.
+## 10. Practical Notes
 
-- Need current runtime flags:
+- **DE has only ~335 positives total**; with a 70/15/15 split that's ~235 / 49 / 49. Tweet-level F1 can swing ±3 percentage points purely from sample variance.
+- **Positive recall and precision must be tracked together** — overall accuracy is dominated by the negative class and uninformative.
+- **Threshold collapse** to extreme negative values (predict everything positive) was a real failure mode under `recall_at_precision` with low `min_precision`. Current defaults (`f1`, search range `[-0.2, 0.8]`) prevent this.
+- **The biggest remaining lever** is the data: more DE positives, label-quality review, or pseudo-labels via translation of EN positives. The pipeline itself is well-tuned at this point.
 
-```bash
-C:/Users/erikk/miniconda3/envs/antisemitism-nli/python.exe -m src.train --help
-```
+## 11. Troubleshooting
+
+- **Threshold calibration says `constraint_satisfied=False`** → no threshold reached `min_precision`. Either lower `--threshold_min_precision` or accept the fallback (recall-optimal).
+- **Training appears stuck after `trainer.train()` finishes** → tweet-level checkpoint sweep + threshold calibration are running; both perform full-validation scoring loops with progress logs.
+- **DE F1 stuck around 0.35–0.40** → likely a data ceiling, not a hyperparameter problem. See Section 10.
+- **`--epochs N` ignored** → confirm you're not also passing `--de_only` to a multi-stage command; mode flags are exclusive.
