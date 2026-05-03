@@ -1,0 +1,1558 @@
+# ==ENGLISH EVALUATION==============================================================================
+FINAL EVALUATION ON HELD-OUT TEST SETS
+
+---
+
+## Evaluating English model on held-out test set...
+
+## Loading checkpoint from: checkpoints/xlmr-nli
+Evaluating on: data/en_cleaned_test_holdout.csv
+Language: en
+
+Decision threshold (margin score_1-score_0): -0.4650
+Hypothesis score formula: entailment
+Score mode: entailment_only
+Class-0 weight (non-antisemitic dampening): 0.7000
+
+Original test samples: 1590
+Class distribution: {0: 1310, 1: 280}
+
+Making predictions...
+
+================================================================================
+EVALUATION RESULTS
+
+Accuracy:          0.8101 (81.01%)
+Positive Precision:0.4693
+Positive Recall:   0.6000
+Positive F1:       0.5266
+
+---
+
+## CONFUSION MATRIX
+
+```
+                Predicted
+             Non-AS    AS
+```
+
+Actual Non-AS     1120    190
+Actual AS          112    168
+
+---
+
+## CLASSIFICATION REPORT
+
+```
+                 precision    recall  f1-score   support
+```
+
+Non-Antisemitic (0)     0.9091    0.8550    0.8812      1310
+Antisemitic (1)     0.4693    0.6000    0.5266       280
+
+```
+       accuracy                         0.8101      1590
+      macro avg     0.6892    0.7275    0.7039      1590
+   weighted avg     0.8316    0.8101    0.8188      1590
+```
+
+================================================================================
+
+================================================================================
+DETAILED ANALYSIS
+
+True Positives (Antisemitic correctly identified): 168
+False Positives (Incorrectly labeled antisemitic): 190
+False Negatives (Missed antisemitic texts): 112
+True Negatives (Non-antisemitic correct): 1120
+
+================================================================================
+TRUE POSITIVES - Antisemitic Texts Correctly Identified (showing 10/168)
+
+[4] Idc what Kanye said about the jews im more concerned about the damage hes doin to the black community
+Class scores: score_0=0.0150, score_1=0.9919, margin=0.9769
+Top hypotheses for Antisemitic (1):
+[0.9919] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.9850] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+Top hypotheses for Non-Antisemitic (0):
+[0.0273] The text criticizes state, military, or party-political actions without holding Jews as a group responsible.
+[0.0245] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+
+[22] Is the UN still looking in the opposite direction from ZioNazi Israel’s War Crimes?
+Class scores: score_0=0.5453, score_1=0.2110, margin=-0.3343
+Top hypotheses for Antisemitic (1):
+[0.2110] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+[0.0932] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+Top hypotheses for Non-Antisemitic (0):
+[0.9073] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+[0.9020] The text discusses Israel, a government, institutions, or political actors without turning this into claims about Jews in general.
+
+[29] David Lammy - an anti semite who supports apartheid israel zionazis
+Class scores: score_0=0.0038, score_1=0.9975, margin=0.9936
+Top hypotheses for Antisemitic (1):
+[0.9975] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+[0.9974] The text uses dehumanizing terms like animals, parasites, or devils for Jewish people or the State of Israel.
+Top hypotheses for Non-Antisemitic (0):
+[0.0057] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+[0.0056] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[36] RT : Irish MP Richard Boyd Barrett is consistently brilliant at exposing Israel. #FreePalestine #ApartheidIsrael
+Class scores: score_0=0.0033, score_1=0.9978, margin=0.9945
+Top hypotheses for Antisemitic (1):
+[0.9978] The text uses dehumanizing terms like animals, parasites, or devils for Jewish people or the State of Israel.
+[0.9978] The text uses 'Zionists' as a code word to project malicious traits onto Jews.
+Top hypotheses for Non-Antisemitic (0):
+[0.0053] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+[0.0050] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[57] RT : Abe is just your typical garden variety Zionazi
+Class scores: score_0=0.0042, score_1=0.9977, margin=0.9935
+Top hypotheses for Antisemitic (1):
+[0.9977] The text denies Israel's right to exist or calls for violence against its Jewish population.
+[0.9976] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+Top hypotheses for Non-Antisemitic (0):
+[0.0064] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.0063] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+
+[66] "We're Going to Take out 7 Countries in 5 Years Iraq_Syria_Lebanon_Libya_Somalia_Sudan Iran" ZioNazism�
+Class scores: score_0=0.0076, score_1=0.9939, margin=0.9863
+Top hypotheses for Antisemitic (1):
+[0.9939] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+[0.9939] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+Top hypotheses for Non-Antisemitic (0):
+[0.0176] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+[0.0118] The text discusses Israel, a government, institutions, or political actors without turning this into claims about Jews in general.
+
+[78] It's so funny when Zionists argue, "if you boycott Israel, how come you don't boycott Saudi? or China?" First of all, thank you for finally admitting Israel is responsible for egregious human rights a...
+Class scores: score_0=0.5759, score_1=0.4174, margin=-0.1584
+Top hypotheses for Antisemitic (1):
+[0.4174] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+[0.3934] The text demands standards of behavior from Jews or Israel not expected of any other democratic nation.
+Top hypotheses for Non-Antisemitic (0):
+[0.9093] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.8267] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+
+[89] Zionazi terorist bastard
+Class scores: score_0=0.0050, score_1=0.9973, margin=0.9923
+Top hypotheses for Antisemitic (1):
+[0.9973] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+[0.9972] The text denies Israel's right to exist or calls for violence against its Jewish population.
+Top hypotheses for Non-Antisemitic (0):
+[0.0086] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+[0.0077] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+
+[93] Rothschild Zionists and ZioNazis are popular as well.
+Class scores: score_0=0.0054, score_1=0.9976, margin=0.9922
+Top hypotheses for Antisemitic (1):
+[0.9976] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+[0.9962] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+Top hypotheses for Non-Antisemitic (0):
+[0.0094] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.0074] The text discusses Israel, a government, institutions, or political actors without turning this into claims about Jews in general.
+
+[102] I am a Muslim. \nISIS kill me in Syria and Iraq.\nJews kill me in Palestine.\nHindus kill me in Kashmir.\nBhuddists kill me in Burma.\nChristians kill me in Afghanistan and Africa.\nAn Australian kill...
+Class scores: score_0=0.0054, score_1=0.9973, margin=0.9919
+Top hypotheses for Antisemitic (1):
+[0.9973] The text demands standards of behavior from Jews or Israel not expected of any other democratic nation.
+[0.9972] The text denies Israel's right to exist or calls for violence against its Jewish population.
+Top hypotheses for Non-Antisemitic (0):
+[0.0082] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.0081] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+
+================================================================================
+FALSE POSITIVES - Non-Antisemitic Incorrectly Labeled (showing 10/190)
+
+[7] TRUE LABEL: Non-Antisemitic (0)
+Not sure that bullying individual Jews helps.
+Class scores: score_0=0.6727, score_1=0.3873, margin=-0.2854
+Top hypotheses for Antisemitic (1):
+[0.3873] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.1332] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+Top hypotheses for Non-Antisemitic (0):
+[0.9764] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.9684] The text criticizes state, military, or party-political actions without holding Jews as a group responsible.
+
+[13] TRUE LABEL: Non-Antisemitic (0)
+"When Jews take over a country, they kill millions of Christians," says a supporter arguing against impeachment which he says will start a civil war and the military will have to choose sides. Why do ...
+Class scores: score_0=0.6392, score_1=0.1940, margin=-0.4452
+Top hypotheses for Antisemitic (1):
+[0.1940] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.1744] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+Top hypotheses for Non-Antisemitic (0):
+[0.9328] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.9173] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[14] TRUE LABEL: Non-Antisemitic (0)
+Israel and India are using the COVID-19 pandemic to expand settler colonial projects in Palestine and Kashmir.\n\nMy latest for .\n\n
+Class scores: score_0=0.5363, score_1=0.6770, margin=0.1407
+Top hypotheses for Antisemitic (1):
+[0.6770] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.3893] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+Top hypotheses for Non-Antisemitic (0):
+[0.8280] The text criticizes state, military, or party-political actions without holding Jews as a group responsible.
+[0.8235] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+
+[15] TRUE LABEL: Non-Antisemitic (0)
+I know many confuse Matt 24 but I believe it speaks only of the end of the age and the Jews redemption those that turn to Jesus that is. Rev 4-6 shows the rapture of the church and them in Heaven. cha...
+Class scores: score_0=0.0481, score_1=0.9772, margin=0.9291
+Top hypotheses for Antisemitic (1):
+[0.9772] The text demands standards of behavior from Jews or Israel not expected of any other democratic nation.
+[0.9744] The text implies innate greed or illegitimate power through money and banking.
+Top hypotheses for Non-Antisemitic (0):
+[0.1013] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.0863] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+
+[18] TRUE LABEL: Non-Antisemitic (0)
+#TheSixthSealofGOD The ox knows its master, the donkey its owner’s manger, but Israel does not know, my people do not understand.”\nIsaiah 1:3 NIV
+Class scores: score_0=0.0107, score_1=0.9953, margin=0.9846
+Top hypotheses for Antisemitic (1):
+[0.9953] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+[0.9948] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+Top hypotheses for Non-Antisemitic (0):
+[0.0194] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.0157] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[19] TRUE LABEL: Non-Antisemitic (0)
+Are you referring to the Jews of Europe?
+Class scores: score_0=0.4129, score_1=0.8274, margin=0.4145
+Top hypotheses for Antisemitic (1):
+[0.8274] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.6835] The text uses 'Zionists' as a code word to project malicious traits onto Jews.
+Top hypotheses for Non-Antisemitic (0):
+[0.7640] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.7063] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[34] TRUE LABEL: Non-Antisemitic (0)
+Just found out us Jews are the elites who have control over this planet and are responsible for everything happening in it. So wild! Is everyone else in on this?? Can't believe they'd leave me out of ...
+Class scores: score_0=0.0049, score_1=0.9976, margin=0.9927
+Top hypotheses for Antisemitic (1):
+[0.9976] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+[0.9976] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+Top hypotheses for Non-Antisemitic (0):
+[0.0076] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.0074] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+
+[48] TRUE LABEL: Non-Antisemitic (0)
+Covid-19: Impact on Israel
+Class scores: score_0=0.4569, score_1=0.9753, margin=0.5185
+Top hypotheses for Antisemitic (1):
+[0.9753] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+[0.9546] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+Top hypotheses for Non-Antisemitic (0):
+[0.7555] The text discusses Israel, a government, institutions, or political actors without turning this into claims about Jews in general.
+[0.7382] The text criticizes state, military, or party-political actions without holding Jews as a group responsible.
+
+[65] TRUE LABEL: Non-Antisemitic (0)
+THOSED INDEPENDENT ON ISRAEL WORLD WAR 11 .PALESTIAN WRONG ON WORLD .
+Class scores: score_0=0.0240, score_1=0.9759, margin=0.9519
+Top hypotheses for Antisemitic (1):
+[0.9759] The text denies Israel's right to exist or calls for violence against its Jewish population.
+[0.9572] The text claims that Jews secretly control global politics, the financial system, or the media.
+Top hypotheses for Non-Antisemitic (0):
+[0.0556] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.0471] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+
+[69] TRUE LABEL: Non-Antisemitic (0)
+Israel is our Ally.\nPalestinian is no loss they need us more than we need them. They should feel honored to have us as a friend but instead they want to play politics to save face with their people.
+Class scores: score_0=0.2380, score_1=0.7233, margin=0.4853
+Top hypotheses for Antisemitic (1):
+[0.7233] The text claims that Jews secretly control global politics, the financial system, or the media.
+[0.7172] The text denies, trivializes, or distorts the historical facts of the Holocaust.
+Top hypotheses for Non-Antisemitic (0):
+[0.5366] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.4280] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+
+================================================================================
+FALSE NEGATIVES - Antisemitic Texts Missed (showing 10/112)
+
+[11] TRUE LABEL: Antisemitic (1)
+The Poles did not play a pivotal, significant (in comparison to many other countries, itâ€™s a barely marginal) role in the genocide of the Jews; itâ€™s practically nil if we consider the facts object...
+Class scores: score_0=0.6892, score_1=0.0365, margin=-0.6527
+Top hypotheses for Antisemitic (1):
+[0.0365] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.0338] The text implies innate greed or illegitimate power through money and banking.
+Top hypotheses for Non-Antisemitic (0):
+[0.9876] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.9864] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+
+[67] TRUE LABEL: Antisemitic (1)
+the little goblins that run this website love shit like 'beans' or 'Israel.'
+Class scores: score_0=0.6946, score_1=0.0076, margin=-0.6869
+Top hypotheses for Antisemitic (1):
+[0.0076] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.0072] The text implies innate greed or illegitimate power through money and banking.
+Top hypotheses for Non-Antisemitic (0):
+[0.9928] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.9928] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+
+[73] TRUE LABEL: Antisemitic (1)
+Note how in that graph its almost always names of countries/race and then Jews (a religion). Im sure there is a criterion(a) for the graph but a term other than Jew would probably be more accurate.
+Class scores: score_0=0.6574, score_1=0.0854, margin=-0.5720
+Top hypotheses for Antisemitic (1):
+[0.0854] The text claims that Jews secretly control global politics, the financial system, or the media.
+[0.0837] The text expresses hatred, contempt, or hostility toward Jews as a religious or ethnic group.
+Top hypotheses for Non-Antisemitic (0):
+[0.9513] The text contains no blanket negative attribution toward Jews as a religious or ethnic community.
+[0.9471] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[85] TRUE LABEL: Antisemitic (1)
+among Jews there is antisemitism, #goyhatred racism, facism as well.
+Class scores: score_0=0.6960, score_1=0.0062, margin=-0.6898
+Top hypotheses for Antisemitic (1):
+[0.0062] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+[0.0060] The text implies innate greed or illegitimate power through money and banking.
+Top hypotheses for Non-Antisemitic (0):
+[0.9952] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+[0.9948] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[111] TRUE LABEL: Antisemitic (1)
+RT : a masjid is for praying. it's a place of peace and worship. masjid al aqsa has such a large significance in Islam as it was the first qibla and also the place where the prophet Muhammad saw ascen...
+Class scores: score_0=0.6855, score_1=0.0233, margin=-0.6621
+Top hypotheses for Antisemitic (1):
+[0.0233] The text implies innate greed or illegitimate power through money and banking.
+[0.0206] The text denies, trivializes, or distorts the historical facts of the Holocaust.
+Top hypotheses for Non-Antisemitic (0):
+[0.9841] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.9802] The text discusses Israel, a government, institutions, or political actors without turning this into claims about Jews in general.
+
+[135] TRUE LABEL: Antisemitic (1)
+Oh no i see ! It was about kate hikes right ? Well its just hate kikes reversed !
+Class scores: score_0=0.6833, score_1=0.0236, margin=-0.6597
+Top hypotheses for Antisemitic (1):
+[0.0236] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.0198] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+Top hypotheses for Non-Antisemitic (0):
+[0.9813] The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.
+[0.9781] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[144] TRUE LABEL: Antisemitic (1)
+Jews In US Congress Cheer As Antisemitism Bill Is Passed #BitChute
+Class scores: score_0=0.6882, score_1=0.0091, margin=-0.6791
+Top hypotheses for Antisemitic (1):
+[0.0091] The text implies innate greed or illegitimate power through money and banking.
+[0.0078] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+Top hypotheses for Non-Antisemitic (0):
+[0.9863] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.9859] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+
+[147] TRUE LABEL: Antisemitic (1)
+This is true of some other countries, also. France is one such country. In France, criticism of Israel is considered an attack on Judaism but an attack on Islam, is fair game!!!
+Class scores: score_0=0.6959, score_1=0.0082, margin=-0.6877
+Top hypotheses for Antisemitic (1):
+[0.0082] The text implies innate greed or illegitimate power through money and banking.
+[0.0078] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+Top hypotheses for Non-Antisemitic (0):
+[0.9946] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+[0.9944] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+
+[155] TRUE LABEL: Antisemitic (1)
+RT : If you donâ€™t stand for Israel bombing babies that they claim were used as human shields- you will be labeled as an antisemitic person criminalized. The public is only allowed to feel bad for th...
+Class scores: score_0=0.6957, score_1=0.0060, margin=-0.6897
+Top hypotheses for Antisemitic (1):
+[0.0060] The text equates the actions of the State of Israel or Zionists with the crimes of the Nazis.
+[0.0060] The text implies innate greed or illegitimate power through money and banking.
+Top hypotheses for Non-Antisemitic (0):
+[0.9944] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.9942] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+[158] TRUE LABEL: Antisemitic (1)
+Let�s also talk about how many Jews owned slaves and how they owned the slave ships. Let�s also talk about why no one is allowed to talk about these facts without having to be sent for holocaust train...
+Class scores: score_0=0.6568, score_1=0.0255, margin=-0.6313
+Top hypotheses for Antisemitic (1):
+[0.0255] The text uses 'Zionists' as a code word to project malicious traits onto Jews.
+[0.0251] The text holds all Jews worldwide responsible for the actions of the State of Israel or historical events.
+Top hypotheses for Non-Antisemitic (0):
+[0.9658] The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.
+[0.9488] The text describes political events or conflict in factual terms without sweeping claims about Jews as a religious or ethnic group.
+
+================================================================================
+
+---
+
+## Evaluating German model on held-out test set...
+
+## Loading checkpoint from: checkpoints/xlmr-nli\de_ft
+Evaluating on: data/de_cleaned_test_holdout.csv
+Language: de
+
+Decision threshold (margin score_1-score_0): -0.0775
+Hypothesis score formula: entailment
+Score mode: entailment_only
+Class-0 weight (non-antisemitic dampening): 0.7000
+
+Original test samples: 1101
+Class distribution: {0: 1052, 1: 49}
+
+Making predictions...
+
+# ==GERMAN EVALUATION==============================================================================
+EVALUATION RESULTS
+
+Accuracy:          0.9528 (95.28%)
+Positive Precision:0.4727
+Positive Recall:   0.5306
+Positive F1:       0.5000
+
+---
+
+## CONFUSION MATRIX
+
+```
+                Predicted
+             Non-AS    AS
+```
+
+Actual Non-AS     1023     29
+Actual AS           23     26
+
+---
+
+## CLASSIFICATION REPORT
+
+```
+                 precision    recall  f1-score   support
+```
+
+Non-Antisemitic (0)     0.9780    0.9724    0.9752      1052
+Antisemitic (1)     0.4727    0.5306    0.5000        49
+
+```
+       accuracy                         0.9528      1101
+      macro avg     0.7254    0.7515    0.7376      1101
+   weighted avg     0.9555    0.9528    0.9541      1101
+```
+
+================================================================================
+
+================================================================================
+DETAILED ANALYSIS
+
+True Positives (Antisemitic correctly identified): 26
+False Positives (Incorrectly labeled antisemitic): 29
+False Negatives (Missed antisemitic texts): 23
+True Negatives (Non-antisemitic correct): 1023
+
+================================================================================
+TRUE POSITIVES - Antisemitic Texts Correctly Identified (showing 10/26)
+
+[20] Was ist bei Ihnen, in ihrer faschistoiden Birne überhaupt noch klar? Kritik an Israel ist kein Antisemitismus. Die Palästinenser werden geknechtet, eingesperrt, getötet, seit 1948. Ich boykottiere all...
+Class scores: score_0=0.0583, score_1=0.9997, margin=0.9414
+Top hypotheses for Antisemitic (1):
+[0.9997] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+[0.9996] Der Text unterstellt Juden eine angeborene Gier oder eine illegitime Macht durch Geld und Bankwesen.
+Top hypotheses for Non-Antisemitic (0):
+[0.2231] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+[0.1461] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+[44] Juden = Banken/ Gold/ Juwelen = Kapital = Kapitalismus\nWas hassen Linke?\nRichtig, den Kapitalismus
+Class scores: score_0=0.0069, score_1=0.9981, margin=0.9911
+Top hypotheses for Antisemitic (1):
+[0.9981] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+[0.9956] Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.
+Top hypotheses for Non-Antisemitic (0):
+[0.0203] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+[0.0107] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[110] "Mordaufrufe an Juden"?Israeljubler sind sowas von verlogen. Jedes Mittel ist ihnen Recht,um Proteste gg den Siedlerkolonial-, Besatzer u Apartheidstaat zu diskreditieren. Moralisch so tief gesunken,d...
+Class scores: score_0=0.0005, score_1=0.9999, margin=0.9994
+Top hypotheses for Antisemitic (1):
+[0.9999] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+[0.9999] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+Top hypotheses for Non-Antisemitic (0):
+[0.0011] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.0008] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[138] Wozu habe ich Deutsch gelernt wenn ich nicht mal das sagen kann: Israel ist ein terroristischer Staat, der Kinder ermordet. Es ist das größte Übel für die Muslimen und die Juden; ein Hindernis für den...
+Class scores: score_0=0.0003, score_1=0.9999, margin=0.9996
+Top hypotheses for Antisemitic (1):
+[0.9999] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+[0.9998] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+Top hypotheses for Non-Antisemitic (0):
+[0.0005] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+[0.0004] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+[308] RT : Wozu polit. korrekte Atlantikbrücken "Antideutsche" Menschenfreunde in ihrer bedingungslosen US/NATO/Israel-Regierungstreue schweigen Schluss mit Käfighaltung! Das Töten von Palästinensern wird i...
+Class scores: score_0=0.6928, score_1=0.6663, margin=-0.0265
+Top hypotheses for Antisemitic (1):
+[0.6663] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+[0.2930] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+Top hypotheses for Non-Antisemitic (0):
+[0.9970] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.9958] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+
+[451] #deutschland durch den Terrorangriffe der Israelis sterben so viele Palästinenser tagtäglich und es interessiert keinen deutschen und haben nicht den Mut etwas gegen Israel zu sagen und jetzt soll der...
+Class scores: score_0=0.5337, score_1=0.6592, margin=0.1255
+Top hypotheses for Antisemitic (1):
+[0.6592] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+[0.5331] Der Text unterstellt Juden eine angeborene Gier oder eine illegitime Macht durch Geld und Bankwesen.
+Top hypotheses for Non-Antisemitic (0):
+[0.8976] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+[0.8713] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+
+[505] wenn dir kalt ist werde ich den Juden verbrennen 😂😂😂
+Class scores: score_0=0.4760, score_1=0.8461, margin=0.3701
+Top hypotheses for Antisemitic (1):
+[0.8461] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+[0.7122] Der Text setzt das Handeln des Staates Israel oder von Zionisten mit den Verbrechen der Nationalsozialisten gleich.
+Top hypotheses for Non-Antisemitic (0):
+[0.9800] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+[0.7409] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+[543] #ApartheidIsrael verstösst auch gegen das Menschenrecht auf Zugang zu Wasser! \n\n„Menschenrechtsorganisationen wie Amnesty International und Betselem werfen Israel vor, die Palästinenser bei der Wass...
+Class scores: score_0=0.0003, score_1=0.9998, margin=0.9995
+Top hypotheses for Antisemitic (1):
+[0.9998] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+[0.9998] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+Top hypotheses for Non-Antisemitic (0):
+[0.0004] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+[0.0004] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+[614] Israelische Siedler in Jaffa( Nord Palästina 🇵🇸) hat jeden einzelnen Arabischen Häuser in Rot markiert , um nachher sie zutöten . Das genauso was den Nazi mit Juden gemacht hat . Isralische Besetzung ...
+Class scores: score_0=0.0181, score_1=0.9998, margin=0.9817
+Top hypotheses for Antisemitic (1):
+[0.9998] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+[0.9998] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+Top hypotheses for Non-Antisemitic (0):
+[0.0439] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+[0.0395] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[633] Israel muss endlich auf Gewalt, Raub, Ausbeutung, ethnische Säuberungen und Terror gegen die indigene Zivilbevölkerung in den besetzten Gebieten verzichten,\n\nmuss aufhören,\nVölkerrecht und Menschen...
+Class scores: score_0=0.0173, score_1=0.9549, margin=0.9377
+Top hypotheses for Antisemitic (1):
+[0.9549] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.9532] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+Top hypotheses for Non-Antisemitic (0):
+[0.0350] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.0338] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+================================================================================
+FALSE POSITIVES - Non-Antisemitic Incorrectly Labeled (showing 10/29)
+
+[13] TRUE LABEL: Non-Antisemitic (0)
+Der Documenta-Skandal geht weiter: Ein Künstler namens Ahsan, der die Documenta für „seine Ausstellung“ hält, bezeichnet Bundeskanzler Scholz als "neoliberales faschistisches Schwein Olaf". Israel häl...
+Class scores: score_0=0.2410, score_1=0.9949, margin=0.7538
+Top hypotheses for Antisemitic (1):
+[0.9949] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+[0.9734] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+Top hypotheses for Non-Antisemitic (0):
+[0.7334] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.4235] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+
+[86] TRUE LABEL: Non-Antisemitic (0)
+Saul Friedländer erhält den Balzan Preis: „Die Juden kamen ja meist nur als Opferzahlen vor. Ich wollte den Ermordeten ihre Stimme zurückgeben.“ Für den Historiker und Schoah-Überlebenden Saul Friedlä...
+Class scores: score_0=0.6946, score_1=0.9306, margin=0.2359
+Top hypotheses for Antisemitic (1):
+[0.9306] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+[0.9229] Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.
+Top hypotheses for Non-Antisemitic (0):
+[0.9972] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+[0.9960] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[96] TRUE LABEL: Non-Antisemitic (0)
+Palästinenser: Israel isoliert al-Aqsa \n\nDer Leiter des "Jerusalem-Komitees" des Palästinenser-Parlaments fordert die internationale Gemeinschaft auf, israelische Führer wegen ... \n #Nahost #Jeruse...
+Class scores: score_0=0.6717, score_1=0.9912, margin=0.3195
+Top hypotheses for Antisemitic (1):
+[0.9912] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+[0.9879] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+Top hypotheses for Non-Antisemitic (0):
+[0.9849] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+[0.9771] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[107] TRUE LABEL: Non-Antisemitic (0)
+Was ist rechts? Auf das Existenzrecht von Israel zu pochen? 🤪
+Class scores: score_0=0.2210, score_1=0.9946, margin=0.7736
+Top hypotheses for Antisemitic (1):
+[0.9946] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.9899] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+Top hypotheses for Non-Antisemitic (0):
+[0.4754] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+[0.4483] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+[109] TRUE LABEL: Non-Antisemitic (0)
+Die EU droht einem anderen Land mit Konsequenzen beim EU-Beitritt, wenn es die Botschaft in Israel in die Hauptstadt Jerusalem verlegt. Diese EU-Grossreich-Faschisten sind wieder am Werk. #Israel #Bot...
+Class scores: score_0=0.6939, score_1=0.8236, margin=0.1297
+Top hypotheses for Antisemitic (1):
+[0.8236] Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.
+[0.7612] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+Top hypotheses for Non-Antisemitic (0):
+[0.9979] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.9970] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+[131] TRUE LABEL: Non-Antisemitic (0)
+Sagen Juden auch. Du unterscheidest dich nicht.
+Class scores: score_0=0.6993, score_1=0.6799, margin=-0.0194
+Top hypotheses for Antisemitic (1):
+[0.6799] Der Text unterstellt Juden eine angeborene Gier oder eine illegitime Macht durch Geld und Bankwesen.
+[0.2914] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+Top hypotheses for Non-Antisemitic (0):
+[0.9995] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+[0.9994] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[214] TRUE LABEL: Non-Antisemitic (0)
+Ginge es dem #Bundestag wirklich um Völkerrecht, würde sich die "ehrenwerte Gesellschaft" für die Entstehung eines kurdischen Staates, Unabhängigkeit Tibets, oder Rückzug der Türkei aus Zypern mit der...
+Class scores: score_0=0.4284, score_1=0.5621, margin=0.1337
+Top hypotheses for Antisemitic (1):
+[0.5621] Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.
+[0.4133] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+Top hypotheses for Non-Antisemitic (0):
+[0.9108] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+[0.8233] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[340] TRUE LABEL: Non-Antisemitic (0)
+„Ich hab nicht gegen Juden, aber diese kleine Elite.“
+Class scores: score_0=0.0999, score_1=0.9998, margin=0.8999
+Top hypotheses for Antisemitic (1):
+[0.9998] Der Text unterstellt Juden eine angeborene Gier oder eine illegitime Macht durch Geld und Bankwesen.
+[0.9995] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+Top hypotheses for Non-Antisemitic (0):
+[0.5532] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+[0.1511] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[341] TRUE LABEL: Non-Antisemitic (0)
+Gedankenverlorenes Territorium: Wir wollen nicht ausdrücklich Juden aus Palästina wegvölkermorden – wir wollen nur, dass keiner sich einmischt, wenn wir es tun: Marwan Shibli, palästinensischer Aktivi...
+Class scores: score_0=0.0033, score_1=0.9996, margin=0.9963
+Top hypotheses for Antisemitic (1):
+[0.9996] Der Text unterstellt Juden eine angeborene Gier oder eine illegitime Macht durch Geld und Bankwesen.
+[0.9996] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+Top hypotheses for Non-Antisemitic (0):
+[0.0090] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+[0.0085] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+[349] TRUE LABEL: Non-Antisemitic (0)
+Nichts sagt so sehr, dass es einem um die Rechte von Queers geht, wie wenn das erste, was man im Live-Stream sieht, eine Rede darüber ist, wie der "Apartheids-Staat" Israel den Rechten queerer Palästi...
+Class scores: score_0=0.0005, score_1=0.9998, margin=0.9994
+Top hypotheses for Antisemitic (1):
+[0.9998] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+[0.9998] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+Top hypotheses for Non-Antisemitic (0):
+[0.0009] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.0008] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+================================================================================
+FALSE NEGATIVES - Antisemitic Texts Missed (showing 10/23)
+
+[12] TRUE LABEL: Antisemitic (1)
+Würden sich alle Menschen, auch Juden und Muslime, dem Christentum in der BRD mit Würde unterwerfen, ehrlich, gemäß der Ehrwürdigen Maria, der Mutter Jesu, dem Ehrwürdigen Sohne Maryams, würden wir au...
+Class scores: score_0=0.6999, score_1=0.0005, margin=-0.6994
+Top hypotheses for Antisemitic (1):
+[0.0005] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.0005] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+Top hypotheses for Non-Antisemitic (0):
+[0.9999] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.9999] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+[76] TRUE LABEL: Antisemitic (1)
+Vielleicht sollte der Autor dieses widerlichen Hetzartikels der Leserschaft erklären, warum #Israel\n1) seine Grenzen nicht einhält\n2) UN Resolutionen missachtet\n3) Palästina nicht anerkennt\n4) nic...
+Class scores: score_0=0.6999, score_1=0.0005, margin=-0.6994
+Top hypotheses for Antisemitic (1):
+[0.0005] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+[0.0005] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+Top hypotheses for Non-Antisemitic (0):
+[0.9999] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+[0.9999] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[165] TRUE LABEL: Antisemitic (1)
+Antizionist zu sein bedeutet nicht antisemetisch. Es bedeutet, dass Sie mit der Wahrheit stehen.\nIsrael ist antisemitisch!!! \n#GazaUnderAttak #Gaza #PalestineUnderAttack
+Class scores: score_0=0.6997, score_1=0.0004, margin=-0.6994
+Top hypotheses for Antisemitic (1):
+[0.0004] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+[0.0003] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+Top hypotheses for Non-Antisemitic (0):
+[0.9997] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+[0.9997] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+[259] TRUE LABEL: Antisemitic (1)
+Wenn die Juden mit den Bedingungen in den schnell errichteten oder umgerüsteten Haftanstalten unzufrieden sind, sagen Sie ihnen einfach, dass sie nicht kommen sollen. Alle Probleme gelöst!
+Class scores: score_0=0.6997, score_1=0.0011, margin=-0.6986
+Top hypotheses for Antisemitic (1):
+[0.0011] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+[0.0011] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+Top hypotheses for Non-Antisemitic (0):
+[0.9997] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.9996] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+[264] TRUE LABEL: Antisemitic (1)
+#VomImamMahdiZuAllenMenschen "Wonach suchen die Juden mit ihre Ausgrabungen unter der Al-Aqsa Moschee?" Imam Nasser…
+Class scores: score_0=0.6992, score_1=0.0011, margin=-0.6981
+Top hypotheses for Antisemitic (1):
+[0.0011] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.0011] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+Top hypotheses for Non-Antisemitic (0):
+[0.9993] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+[0.9992] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[355] TRUE LABEL: Antisemitic (1)
+nega sind nix anderes als\nschlecht verbrannte juden\n-Quelle: mein Chat
+Class scores: score_0=0.6999, score_1=0.0011, margin=-0.6988
+Top hypotheses for Antisemitic (1):
+[0.0011] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.0009] Der Text unterstellt Juden eine angeborene Gier oder eine illegitime Macht durch Geld und Bankwesen.
+Top hypotheses for Non-Antisemitic (0):
+[0.9999] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.9999] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+[360] TRUE LABEL: Antisemitic (1)
+RT : Was zu tun ist, was zu einem Bekenntnis zum Existenzrecht von Israel, besser aller Juden und jüdischen und nicht-jüdischen Israelis, aller Palästinenser, letztlich aller Menschen gehört
+Class scores: score_0=0.6994, score_1=0.0009, margin=-0.6984
+Top hypotheses for Antisemitic (1):
+[0.0009] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+[0.0009] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+Top hypotheses for Non-Antisemitic (0):
+[0.9994] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+[0.9993] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[406] TRUE LABEL: Antisemitic (1)
+Israel Viel haben deutsche mainstream Medien Inklusive \nDLF und darüber noch nicht berichtet. Warum?\n Wegen #Antisemitismus gibt es keine Berichte zu Lauchangriffe gegen israelische Bürger inklusive...
+Class scores: score_0=0.6991, score_1=0.0023, margin=-0.6968
+Top hypotheses for Antisemitic (1):
+[0.0023] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.0022] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+Top hypotheses for Non-Antisemitic (0):
+[0.9991] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+[0.9991] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[572] TRUE LABEL: Antisemitic (1)
+Facebook und Twitter: Stoppt die schlechte Debattenkultur in Sozialen Netzwerken via \nDas mag ja alles wohl so sein, aber es ist nicht zu übersehen, dass bestimmte Kräfte daran interesiert sind die L...
+Class scores: score_0=0.6999, score_1=0.0004, margin=-0.6995
+Top hypotheses for Antisemitic (1):
+[0.0004] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.0004] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+Top hypotheses for Non-Antisemitic (0):
+[0.9999] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+[0.9999] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+[667] TRUE LABEL: Antisemitic (1)
+Wir sollten auch aufhören das Völkerrecht als Antisemitismus zu bezeichnen. Isarel und Palästina schffen es nichtv mehr zum Völkerrecht, genau wie Deutschland, als man ähnlich wie in Jerusalem 1938 in...
+Class scores: score_0=0.6996, score_1=0.0010, margin=-0.6986
+Top hypotheses for Antisemitic (1):
+[0.0010] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+[0.0009] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+Top hypotheses for Non-Antisemitic (0):
+[0.9996] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+[0.9995] Der Text beschreibt politische Ereignisse oder Konflikte sachlich, ohne pauschale Urteile über Juden als religiöse oder ethnische Gruppe.
+
+# ==GERMAN EVALUATION TRAINING GERMAN ONLY==============================================================================
+
+--------------------------------------------------------------------------------
+Evaluating German model on held-out test set...
+--------------------------------------------------------------------------------
+Loading checkpoint from: checkpoints\xlmr-nli\de_only
+Evaluating on: data/de_cleaned_test_holdout.csv
+Language: de
+--------------------------------------------------------------------------------
+Decision threshold (margin score_1-score_0): 0.3600
+Hypothesis score formula: entailment
+Score mode: entailment_only
+Class-0 weight (non-antisemitic dampening): 0.7000
+
+Original test samples: 1101
+Class distribution: {0: 1052, 1: 49}
+
+Making predictions...
+
+================================================================================
+EVALUATION RESULTS
+================================================================================
+Accuracy:          0.9255 (92.55%)
+Positive Precision:0.2740
+Positive Recall:   0.4082
+Positive F1:       0.3279
+
+--------------------------------------------------------------------------------
+CONFUSION MATRIX
+--------------------------------------------------------------------------------
+                    Predicted
+                 Non-AS    AS
+Actual Non-AS      999     53
+Actual AS           29     20
+
+--------------------------------------------------------------------------------
+CLASSIFICATION REPORT
+--------------------------------------------------------------------------------
+                     precision    recall  f1-score   support
+
+Non-Antisemitic (0)     0.9718    0.9496    0.9606      1052
+    Antisemitic (1)     0.2740    0.4082    0.3279        49
+
+           accuracy                         0.9255      1101
+          macro avg     0.6229    0.6789    0.6442      1101
+       weighted avg     0.9407    0.9255    0.9324      1101
+
+================================================================================
+
+================================================================================
+DETAILED ANALYSIS
+================================================================================
+True Positives (Antisemitic correctly identified):  20
+False Positives (Incorrectly labeled antisemitic): 53
+False Negatives (Missed antisemitic texts):        29
+True Negatives (Non-antisemitic correct):          999
+================================================================================
+
+================================================================================
+TRUE POSITIVES - Antisemitic Texts Correctly Identified (showing 10/20)
+================================================================================
+
+[12] Wir sollten auch aufhören das Völkerrecht als Antisemitismus zu bezeichnen. Isarel und Palästina schffen es nichtv mehr zum Völkerrecht, genau wie Deutschland, als man ähnlich wie in Jerusalem 1938 in Berlin rief "Tod den Juden!" Völkerrecht muss her, UN hin.
+    Class scores: score_0=0.0405, score_1=0.9900, margin=0.9495
+    Top hypotheses for Antisemitic (1):
+      [0.9900] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.9878] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.1927] Der Text berichtet sachlich über antisemitische Vorfälle, Studien oder Debatten oder verurteilt diese.
+      [0.1208] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[35] Hey : letzten Freitag habt ihr 120k Unterschriften von uns erhalten, die euch auffordern, den Vertrag mit der Israel Football Association zu beenden -- werdet ihr handeln, #PUMAfa? Oder wegschauen? #nosupportforapartheid
+    Class scores: score_0=0.5932, score_1=0.9901, margin=0.3969
+    Top hypotheses for Antisemitic (1):
+      [0.9901] Der Text behauptet, der Antisemitismus-Vorwurf werde missbraucht, um legitime Israel-Kritik zu unterdrücken.
+      [0.9749] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9958] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9926] Der Text ist eine knappe Nachrichtenmeldung, Schlagzeile oder Linkvorschau ohne wertende Aussage über Juden.
+
+[79] Die #Apartheid #Israel 🇮🇱 wird in Zukunft #Kriegsverbrechen Verbrechen gegen die Menschlichkeit begehen, davon ist auszugehen! Werden die Pro-Zionisten Philosemiten in der BRD diese relativieren? Kommt dann die Gesetzesänderung des #Volksverhetzung's-Paragraph 130 zum tragen?
+    Class scores: score_0=0.0005, score_1=0.9996, margin=0.9990
+    Top hypotheses for Antisemitic (1):
+      [0.9996] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+      [0.9995] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0011] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0009] Der Text berichtet sachlich über antisemitische Vorfälle, Studien oder Debatten oder verurteilt diese.
+
+[80] "Israel" wurde halt nicht so angelegt, der Zionismus kannte von Anfang an nur Vorherrschaft durch Gewalt.
+    Class scores: score_0=0.0012, score_1=0.9997, margin=0.9985
+    Top hypotheses for Antisemitic (1):
+      [0.9997] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+      [0.9997] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0104] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0008] Der Text diskutiert Israel, eine Regierung, Institutionen oder politische Akteure, ohne daraus Aussagen über Juden im Allgemeinen abzuleiten.
+
+[183] RT : 3. Faschismus-Stufe nach Paxton Übernahme der Macht Trump, Orban, Gewalt gegen Linke/Andersdenkende #NetzDG systemfinanzierte Kahane-Zensur, israel. Zionismus, von der Leyen/EU
+    Class scores: score_0=0.0003, score_1=0.9994, margin=0.9992
+    Top hypotheses for Antisemitic (1):
+      [0.9994] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+      [0.9994] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0005] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0005] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[300] Nazi Israel
+    Class scores: score_0=0.0003, score_1=0.9997, margin=0.9994
+    Top hypotheses for Antisemitic (1):
+      [0.9997] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+      [0.9996] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0005] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+      [0.0005] Der Text berichtet sachlich über antisemitische Vorfälle, Studien oder Debatten oder verurteilt diese.
+
+[338] Der Apartheidstaat #Israel mordet, massakriert und vertreibt seit seiner Gründung die Araber in Palästina. Alles um ihre rassistische Utopie eines reinen jüdischen Staates zu verwirklichen.\n#Holocaust #Abbas
+    Class scores: score_0=0.0003, score_1=0.9996, margin=0.9993
+    Top hypotheses for Antisemitic (1):
+      [0.9996] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+      [0.9995] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0005] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0005] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[369] Die Auseinandersetzung zwischen Palästinensern und Israel ist kein Konflikt, sondern Ethnische Säuberung. Das ist die Ideologie des zionistischen Siedlerkolonialismus\n1948 #Nakba und Edward Said schrieb angesichts des Oslo Abkommen vom Ende der Zwei-Staaten-Lösung
+    Class scores: score_0=0.0002, score_1=0.9995, margin=0.9992
+    Top hypotheses for Antisemitic (1):
+      [0.9995] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+      [0.9995] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0004] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0004] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[376] Israel sagt, wir sind in unser Land Palästina zurückgekehrt, das Töten ist unser Recht\nDie Ukraine war auch ein Teil von Russland!\nAber das letzte Mal, als Moses den Juden sagte dass sie nicht nach Palästina gehen sollen haben sie sogar ihren Propheten verraten!\n#racism\n#Ukraine
+    Class scores: score_0=0.0003, score_1=0.9996, margin=0.9994
+    Top hypotheses for Antisemitic (1):
+      [0.9996] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+      [0.9996] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0004] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0004] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[428] 7 Das soll nicht heißen,dass gar keine Juden aus arabischen Ländern vertrieben wurden,aber die Hasbara-Zahlen des Siedlerkolonial- u Apartheidstaates sind überzogen.Dein Whataboutism war nur eine Nebelkerze, um von den 75J andauernden Verbrechen an den Palästinensern abzulenken.
+    Class scores: score_0=0.0029, score_1=0.9994, margin=0.9965
+    Top hypotheses for Antisemitic (1):
+      [0.9994] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.9993] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0114] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0055] Der Text ist eine knappe Nachrichtenmeldung, Schlagzeile oder Linkvorschau ohne wertende Aussage über Juden.
+
+================================================================================
+FALSE POSITIVES - Non-Antisemitic Incorrectly Labeled (showing 10/53)
+================================================================================
+
+[10] TRUE LABEL: Non-Antisemitic (0)
+    Wann verfolgt sie die Verteidiger von Zivilabschlachtenden Dschihadisten die nicht nur ihr eigenes Volk wegen "Keiner Solidarität" töten sondern auch harmlose Zivilisten.\nDieser Konflikt ist halt komplizierter als Israel ist Schuld.🤦
+    Class scores: score_0=0.0486, score_1=0.9995, margin=0.9510
+    Top hypotheses for Antisemitic (1):
+      [0.9995] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.9992] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.5953] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0105] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+
+[13] TRUE LABEL: Non-Antisemitic (0)
+    Der Slogan "Sport ist von der Politik getrennt " wird verwendet, wenn keine von den USA und der NATO unterstützten Länder angegriffen werden oder die Angreifer die Vereinigten Staaten und Israel sind.\n#racism\n#Ukraine
+    Class scores: score_0=0.0004, score_1=0.9997, margin=0.9993
+    Top hypotheses for Antisemitic (1):
+      [0.9997] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+      [0.9997] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0008] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+      [0.0008] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[18] TRUE LABEL: Non-Antisemitic (0)
+    Die 🇺🇦 stimmt in der UN für eine int'l Untersuchung der anhaltenden Besetzung Palästinas durch Israel = \n verärgert\n\nDanke 🇺🇦. \nDie zerstörten Häuser v. #Mariupol erinnern stark an jeden v. #Gaza\n\nBTW: 🇦🇹 hat dagegen gestimmt\n\nBesatzer sind hässlich, grausam, brutal..überall
+    Class scores: score_0=0.0003, score_1=0.9997, margin=0.9994
+    Top hypotheses for Antisemitic (1):
+      [0.9997] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+      [0.9997] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0007] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0006] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[42] TRUE LABEL: Non-Antisemitic (0)
+    Wofür wurde das beschlagnamte Vermögen der Juden im 2 Weltkrieg verwendet?
+    Class scores: score_0=0.5502, score_1=0.9989, margin=0.4486
+    Top hypotheses for Antisemitic (1):
+      [0.9989] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.9945] Der Text verwendet 'Zionisten' als Codewort, um bösartige Eigenschaften auf Juden zu projizieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9993] Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.
+      [0.9992] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[62] TRUE LABEL: Non-Antisemitic (0)
+    RT : »Nicht alle Israelis sind Zionisten. Nicht alle Zionisten sind Israelis. Nicht alle Juden sind Zionisten.« Esthe…
+    Class scores: score_0=0.0003, score_1=0.9997, margin=0.9994
+    Top hypotheses for Antisemitic (1):
+      [0.9997] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+      [0.9997] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0005] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0005] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[72] TRUE LABEL: Non-Antisemitic (0)
+    Ist das die #EU, die ihr gewollt habt? Schläger-#Polizei, Schildkröten im Schafspelz, die in #Israel ausgebildet werden, um d.unfolgsamen Untertanen zu Krüppeln zu knüppeln? #GiletsJaunes\n
+    Class scores: score_0=0.5406, score_1=0.9355, margin=0.3949
+    Top hypotheses for Antisemitic (1):
+      [0.9355] Der Text macht alle Juden weltweit für die Handlungen des Staates Israel oder für historische Ereignisse verantwortlich.
+      [0.9321] Der Text macht Witze über die Ermordung von Juden oder verharmlost den Holocaust durch verharmlosende Vergleiche.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9990] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9988] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+
+[94] TRUE LABEL: Non-Antisemitic (0)
+    UN-Menschenrechtsrat: Israel im Gaza-Konflikt der Kriegsverbrechen verdächtigt (RT DE)
+    Class scores: score_0=0.0004, score_1=0.9996, margin=0.9993
+    Top hypotheses for Antisemitic (1):
+      [0.9996] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+      [0.9996] Der Text setzt das Handeln des Staates Israel oder von Zionisten mit den Verbrechen der Nationalsozialisten gleich.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0008] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0006] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+
+[106] TRUE LABEL: Non-Antisemitic (0)
+    »Aber was ist denn mit Sheikh Jarrah?« Die palästinensische Propaganda verkauft Sheikh Jarrah gern als "ethnische Säuberung" und "israelische Eroberungsversuche" von Al-Aqsa. Ein #Kommentar von Melody Sucharewicz.
+    Class scores: score_0=0.0003, score_1=0.9997, margin=0.9993
+    Top hypotheses for Antisemitic (1):
+      [0.9997] Der Text setzt das Handeln des Staates Israel oder von Zionisten mit den Verbrechen der Nationalsozialisten gleich.
+      [0.9997] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0006] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+      [0.0006] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+
+[120] TRUE LABEL: Non-Antisemitic (0)
+    Meine Meinung: #China hat #Covid19 außer Landes gelassen, #Corona zu vertuschen versucht, anstatt das Land abzuriegeln! Wir wollen #Schadenersatz für die dadurch entstandenen Probleme . #XiJinping unterdrückt zudem das Volk der #Uiguren wie einst #Hitler die #Juden!
+    Class scores: score_0=0.0008, score_1=0.9996, margin=0.9988
+    Top hypotheses for Antisemitic (1):
+      [0.9996] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.9995] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0021] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0017] Der Text berichtet sachlich über antisemitische Vorfälle, Studien oder Debatten oder verurteilt diese.
+
+[133] TRUE LABEL: Non-Antisemitic (0)
+    Verflucht sei Israel. Sie sind mit dem, was sie haben, nicht zufrieden und wollen mehr.
+    Class scores: score_0=0.0003, score_1=0.9996, margin=0.9993
+    Top hypotheses for Antisemitic (1):
+      [0.9996] Der Text behauptet, dass Juden heimlich die Weltpolitik, das Finanzsystem oder die Medien kontrollieren.
+      [0.9996] Der Text fordert von Juden oder Israel ein Verhalten, das von keiner anderen demokratischen Nation verlangt wird.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.0006] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.0005] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+================================================================================
+FALSE NEGATIVES - Antisemitic Texts Missed (showing 10/29)
+================================================================================
+
+[49] TRUE LABEL: Antisemitic (1)
+    Deutschland im Einsatz auf dem Stützpunkt mit Geschichte, zusammen mit den "Roten zionistischen Baronen" der mörderischen "Davidstern-Verteidigungssoldaten". Da passt doch die...
+    Class scores: score_0=0.6994, score_1=0.7047, margin=0.0054
+    Top hypotheses for Antisemitic (1):
+      [0.7047] Der Text macht Witze über die Ermordung von Juden oder verharmlost den Holocaust durch verharmlosende Vergleiche.
+      [0.0705] Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9997] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+      [0.9996] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[60] TRUE LABEL: Antisemitic (1)
+    Echt so ein behindert. Dieses Trump-Juden Meme geht auch nicht auf. Medien, ADL und wie sie heissen sind ja alle gegen ihn. Und da sind fast nur Juden in den leitenden Positionen
+    Class scores: score_0=0.6999, score_1=0.0002, margin=-0.6996
+    Top hypotheses for Antisemitic (1):
+      [0.0002] Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.
+      [0.0002] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[77] TRUE LABEL: Antisemitic (1)
+    Dabei sehen ein grossteil der sich selbst als aufgeweckt bezeichnenden nicht mal das soviele Juden dahinter stecken da Ihre pro Juedische Programmierung zu stark ist
+    Class scores: score_0=0.6998, score_1=0.0004, margin=-0.6994
+    Top hypotheses for Antisemitic (1):
+      [0.0004] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0003] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[98] TRUE LABEL: Antisemitic (1)
+    Es geht nicht um Juden, sondern Israelis, genauer um Zionisten. Der aktuelle Konflikt wurde (mal wieder) durch Israels provoziert. Das mal völlig unabhängig von der Geschichte der Staatsgründung und Israels Sechs-Tage-Angriffskrieg mit anschließender Besetzung fremder Gebiete.
+    Class scores: score_0=0.6999, score_1=0.0002, margin=-0.6996
+    Top hypotheses for Antisemitic (1):
+      [0.0002] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0002] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+
+[111] TRUE LABEL: Antisemitic (1)
+    Beyond Chutzpah! By Norman Finkelstein\n\n #BeyondChutzpah #Israel #Palestine #Gaza #RadicalJews #Criticism #Holocaust #SouthAfricanApartheid #NormanFinklestein #MainstreamMedia #WesternMedia #Antisemitism #IsraeliNarrative #PalestinianNarrative
+    Class scores: score_0=0.6999, score_1=0.0001, margin=-0.6998
+    Top hypotheses for Antisemitic (1):
+      [0.0001] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0001] Der Text äußert Hass, Verachtung oder Feindseligkeit gegenüber Juden als religiöse oder ethnische Gruppe.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[186] TRUE LABEL: Antisemitic (1)
+    Haben nicht Juden die eingeladen und Ihnen wiederholt die Tore geöffnet?\nBtw. der reichs-korrekte Begriff ist Anit-Judaismus, machen schliesslich nicht alle Semiten aus.
+    Class scores: score_0=0.6997, score_1=0.0125, margin=-0.6872
+    Top hypotheses for Antisemitic (1):
+      [0.0125] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0029] Der Text macht Witze über die Ermordung von Juden oder verharmlost den Holocaust durch verharmlosende Vergleiche.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9997] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+      [0.9996] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+
+[207] TRUE LABEL: Antisemitic (1)
+    die Faszination, die von Ethnofaschisten ausgeht, muss unbeschreiblich sein - Hauptsache, Israel segnet es ab, wie? - aber diese Bande irritiert selbst dort
+    Class scores: score_0=0.6999, score_1=0.0004, margin=-0.6995
+    Top hypotheses for Antisemitic (1):
+      [0.0004] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0002] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[257] TRUE LABEL: Antisemitic (1)
+    Das hat auch nichts mit der Religion zu tun.\nEs gibt ein Palästina, indem Muslims, Juden und Christen kooperativ zusammen gelebt haben. Selbst arabische Juden werden in Israel diskriminiert.\nNazi Trolle wissen nicht mal, wo die drei monotheistischen Religionen entstanden sind.
+    Class scores: score_0=0.6999, score_1=0.0003, margin=-0.6995
+    Top hypotheses for Antisemitic (1):
+      [0.0003] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0003] Der Text spricht Israel das Existenzrecht ab oder fordert Gewalt gegen dessen jüdische Bevölkerung.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text kritisiert staatliches, militärisches oder parteipolitisches Handeln, ohne Juden als Gruppe verantwortlich zu machen.
+
+[262] TRUE LABEL: Antisemitic (1)
+    Wieviel israelisches Territorium haben die arabischen Staaten besetzt und wieviel arabisches Territorium hat Israel besetzt?\n\nUnd nein, es gibt kein Recht auf Sicherheitspuffer zu Lasten anderer.
+    Class scores: score_0=0.6999, score_1=0.0003, margin=-0.6996
+    Top hypotheses for Antisemitic (1):
+      [0.0003] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0002] Der Text nutzt dehumanisierende Begriffe wie Tiere, Parasiten oder Teufel für jüdische Menschen oder den Staat Israel.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+[265] TRUE LABEL: Antisemitic (1)
+    Den Krieg gegen Deutschland haben damals die Juden und Amis geschürt. Das wird gern vergessen. Hier mein Lesetipp dazu.
+    Class scores: score_0=0.6999, score_1=0.0002, margin=-0.6997
+    Top hypotheses for Antisemitic (1):
+      [0.0002] Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').
+      [0.0001] Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.
+    Top hypotheses for Non-Antisemitic (0):
+      [0.9998] Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.
+      [0.9998] Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.
+
+
+# ==BINARY XLM ROBERTA CLASSIFICATION GERMAN TRAINING ONLY==============================================================================
+
+
+FINAL EVALUATION ON HELD-OUT TEST SET
+================================================================================
+
+--------------------------------------------------------------------------------
+Evaluating German direct binary model on held-out test set...
+--------------------------------------------------------------------------------
+Loading binary checkpoint from: checkpoints\xlmr-binary\de_only
+Evaluating on: data/de_cleaned_test_holdout.csv
+Language: de
+--------------------------------------------------------------------------------
+Binary prediction scoring: 100/1101
+Binary prediction scoring: 200/1101
+Binary prediction scoring: 300/1101
+Binary prediction scoring: 400/1101
+Binary prediction scoring: 500/1101
+Binary prediction scoring: 600/1101
+Binary prediction scoring: 700/1101
+Binary prediction scoring: 800/1101
+Binary prediction scoring: 900/1101
+Binary prediction scoring: 1000/1101
+Binary prediction scoring: 1100/1101
+Binary prediction scoring: 1101/1101
+
+================================================================================
+EVALUATION RESULTS (DIRECT BINARY)
+================================================================================
+Accuracy:          0.9455 (94.55%)
+Positive Precision:0.3590
+Positive Recall:   0.2857
+Positive F1:       0.3182
+
+--------------------------------------------------------------------------------
+CONFUSION MATRIX
+--------------------------------------------------------------------------------
+                    Predicted
+                 Non-AS    AS
+Actual Non-AS     1027     25
+Actual AS           35     14
+
+--------------------------------------------------------------------------------
+CLASSIFICATION REPORT
+--------------------------------------------------------------------------------
+                     precision    recall  f1-score   support
+
+Non-Antisemitic (0)     0.9670    0.9762    0.9716      1052
+    Antisemitic (1)     0.3590    0.2857    0.3182        49
+
+           accuracy                         0.9455      1101
+          macro avg     0.6630    0.6310    0.6449      1101
+       weighted avg     0.9400    0.9455    0.9425      1101
+
+
+================================================================================
+DETAILED ANALYSIS
+================================================================================
+True Positives (Antisemitic correctly identified):  14
+False Positives (Incorrectly labeled antisemitic): 25
+False Negatives (Missed antisemitic texts):        35
+True Negatives (Non-antisemitic correct):          1027
+
+================================================================================
+TRUE POSITIVES - Antisemitic Texts Correctly Identified (showing 10/14)
+================================================================================
+
+[79] Die #Apartheid #Israel 🇮🇱 wird in Zukunft #Kriegsverbrechen Verbrechen gegen die Menschlichkeit begehen, davon ist auszugehen! Werden die Pro-Zionisten Philosemiten in der BRD diese relativieren? Kommt dann die Gesetzesänderung des #Volksverhetzung's-Paragraph 130 zum tragen?
+
+[183] RT : 3. Faschismus-Stufe nach Paxton Übernahme der Macht Trump, Orban, Gewalt gegen Linke/Andersdenkende #NetzDG systemfinanzierte Kahane-Zensur, israel. Zionismus, von der Leyen/EU
+
+[207] die Faszination, die von Ethnofaschisten ausgeht, muss unbeschreiblich sein - Hauptsache, Israel segnet es ab, wie? - aber diese Bande irritiert selbst dort
+
+[338] Der Apartheidstaat #Israel mordet, massakriert und vertreibt seit seiner Gründung die Araber in Palästina. Alles um ihre rassistische Utopie eines reinen jüdischen Staates zu verwirklichen.\n#Holocaust #Abbas
+
+[369] Die Auseinandersetzung zwischen Palästinensern und Israel ist kein Konflikt, sondern Ethnische Säuberung. Das ist die Ideologie des zionistischen Siedlerkolonialismus\n1948 #Nakba und Edward Said schrieb angesichts des Oslo Abkommen vom Ende der Zwei-Staaten-Lösung
+
+[376] Israel sagt, wir sind in unser Land Palästina zurückgekehrt, das Töten ist unser Recht\nDie Ukraine war auch ein Teil von Russland!\nAber das letzte Mal, als Moses den Juden sagte dass sie nicht nach Palästina gehen sollen haben sie sogar ihren Propheten verraten!\n#racism\n#Ukraine
+
+[427] Ja nur leider sind die juden auch kein Unschuldslämmer … Siege Gazastreifen … ja keine Nation kann sich unschuldig fühlen! Und die amis ganz vorne dabei!!!
+
+[428] 7 Das soll nicht heißen,dass gar keine Juden aus arabischen Ländern vertrieben wurden,aber die Hasbara-Zahlen des Siedlerkolonial- u Apartheidstaates sind überzogen.Dein Whataboutism war nur eine Nebelkerze, um von den 75J andauernden Verbrechen an den Palästinensern abzulenken.
+
+[480] Ohhh jaaa da fällt mir doch glatt dieses Bild ein! Frage mich dann allen Ernstes: Als AM der Antrittsbesuch in ISRAEL ...Was ist denn Netanjahu für Sie der Palästina soooo behandelt ihr die BuRe dazu schweigt! Alles nur noch abartig solche heuchlerische Politiker :-)
+
+[580] RT : Gegen jede Kriegspropaganda, jeden Rassismus auch als Antisemitismus gegen Juden ! Palästinenser... "Antideutsche" Palästin…
+
+================================================================================
+FALSE POSITIVES - Non-Antisemitic Incorrectly Labeled (showing 10/25)
+================================================================================
+
+[10] TRUE LABEL: Non-Antisemitic (0)
+    Wann verfolgt sie die Verteidiger von Zivilabschlachtenden Dschihadisten die nicht nur ihr eigenes Volk wegen "Keiner Solidarität" töten sondern auch harmlose Zivilisten.\nDieser Konflikt ist halt komplizierter als Israel ist Schuld.🤦
+
+[62] TRUE LABEL: Non-Antisemitic (0)
+    RT : »Nicht alle Israelis sind Zionisten. Nicht alle Zionisten sind Israelis. Nicht alle Juden sind Zionisten.« Esthe…
+
+[117] TRUE LABEL: Non-Antisemitic (0)
+    Einverstanden, wir müssen dringend unsere friedlichen Juden vor Islamisten schützen!
+
+[133] TRUE LABEL: Non-Antisemitic (0)
+    Verflucht sei Israel. Sie sind mit dem, was sie haben, nicht zufrieden und wollen mehr.
+
+[170] TRUE LABEL: Non-Antisemitic (0)
+    "Rückkehrrecht" viele Generationen nach 1948 Geborener, um Druck auf Israel und damit die USA zu machen einerseits und eine Konfliktlösung zu erschweren andererseits, weil ein gelöster Konflikt Hamas und Iran und Netanjahu schaden würde. Iran braucht Israel als Feind, weil solche
+
+[174] TRUE LABEL: Non-Antisemitic (0)
+    Kann man bei Bundestagskandidat werden und sagen:\n\n"Hier ist das eroberte #Palästina. Es ist weder #Israel, noch #Westjordanland noch #Gaza noch Arab48, das alles ist Palästina."?\n\nWas sagen dazu?
+
+[178] TRUE LABEL: Non-Antisemitic (0)
+    Ich habe sogar eine uneingeschränkte Solidarität mit Israel heißt das das ich alles abfeiere was die Regierung macht? Nein. Israel ist die einzige Demokratie im nahen Osten in der alle Menschen friedlich miteinander leben können. Und ich kann nachvollziehen wieso
+
+[200] TRUE LABEL: Non-Antisemitic (0)
+    #Heuchler!!\n\nDie ganzen Kriegsverbrechen die die USA oder israel begehen sind aber in Ordnung. Ihr Heuchler!\n\nDie Menschheit darf sich nicht mehr länger über die Religion oder Nationalität spalten und aufhetzen lassen!\n\nSehenswert \n\n
+
+[205] TRUE LABEL: Non-Antisemitic (0)
+    Ginge es dem #Bundestag wirklich um Völkerrecht, würde sich die "ehrenwerte Gesellschaft" für die Entstehung eines kurdischen Staates, Unabhängigkeit Tibets, oder Rückzug der Türkei aus Zypern mit der gleichen Intensität einsetzen, wie sie #Israel-Bashing betreibt ! #Annexion
+
+[295] TRUE LABEL: Non-Antisemitic (0)
+    Ich habe ja schon einige verfälschende Darstellungen zur Nahostgeschichte gesehen, aber dass hier die arabischen Staaten und den Angriff auf den neugegründeten Staat Israel einfach weglassen und nur von "Bürgerkrieg" und "Palästina" sprechen, ist ein Unding!
+
+================================================================================
+FALSE NEGATIVES - Antisemitic Texts Missed (showing 10/35)
+================================================================================
+
+[12] TRUE LABEL: Antisemitic (1)
+    Wir sollten auch aufhören das Völkerrecht als Antisemitismus zu bezeichnen. Isarel und Palästina schffen es nichtv mehr zum Völkerrecht, genau wie Deutschland, als man ähnlich wie in Jerusalem 1938 in Berlin rief "Tod den Juden!" Völkerrecht muss her, UN hin.
+
+[35] TRUE LABEL: Antisemitic (1)
+    Hey : letzten Freitag habt ihr 120k Unterschriften von uns erhalten, die euch auffordern, den Vertrag mit der Israel Football Association zu beenden -- werdet ihr handeln, #PUMAfa? Oder wegschauen? #nosupportforapartheid
+
+[49] TRUE LABEL: Antisemitic (1)
+    Deutschland im Einsatz auf dem Stützpunkt mit Geschichte, zusammen mit den "Roten zionistischen Baronen" der mörderischen "Davidstern-Verteidigungssoldaten". Da passt doch die...
+
+[60] TRUE LABEL: Antisemitic (1)
+    Echt so ein behindert. Dieses Trump-Juden Meme geht auch nicht auf. Medien, ADL und wie sie heissen sind ja alle gegen ihn. Und da sind fast nur Juden in den leitenden Positionen
+
+[77] TRUE LABEL: Antisemitic (1)
+    Dabei sehen ein grossteil der sich selbst als aufgeweckt bezeichnenden nicht mal das soviele Juden dahinter stecken da Ihre pro Juedische Programmierung zu stark ist
+
+[80] TRUE LABEL: Antisemitic (1)
+    "Israel" wurde halt nicht so angelegt, der Zionismus kannte von Anfang an nur Vorherrschaft durch Gewalt.
+
+[98] TRUE LABEL: Antisemitic (1)
+    Es geht nicht um Juden, sondern Israelis, genauer um Zionisten. Der aktuelle Konflikt wurde (mal wieder) durch Israels provoziert. Das mal völlig unabhängig von der Geschichte der Staatsgründung und Israels Sechs-Tage-Angriffskrieg mit anschließender Besetzung fremder Gebiete.
+
+[111] TRUE LABEL: Antisemitic (1)
+    Beyond Chutzpah! By Norman Finkelstein\n\n #BeyondChutzpah #Israel #Palestine #Gaza #RadicalJews #Criticism #Holocaust #SouthAfricanApartheid #NormanFinklestein #MainstreamMedia #WesternMedia #Antisemitism #IsraeliNarrative #PalestinianNarrative
+
+[186] TRUE LABEL: Antisemitic (1)
+    Haben nicht Juden die eingeladen und Ihnen wiederholt die Tore geöffnet?\nBtw. der reichs-korrekte Begriff ist Anit-Judaismus, machen schliesslich nicht alle Semiten aus.
+
+[257] TRUE LABEL: Antisemitic (1)
+    Das hat auch nichts mit der Religion zu tun.\nEs gibt ein Palästina, indem Muslims, Juden und Christen kooperativ zusammen gelebt haben. Selbst arabische Juden werden in Israel diskriminiert.\nNazi Trolle wissen nicht mal, wo die drei monotheistischen Religionen entstanden sind.
+
+================================================================================
+TRAINING COMPLETE
+================================================================================
+GPU: NVIDIA GeForce RTX 4080 SUPER
+(antisemitism-nli) PS C:\Users\erikk\Documents\GitHub\antisemitismClassifier>
+
+# ==BINARY XLM ROBERTA CLASSIFICATION ENGLISH AND GERMYN TRAINING==============================================================================
+FINAL EVALUATION ON HELD-OUT TEST SETS
+================================================================================
+
+--------------------------------------------------------------------------------
+Evaluating English direct binary model on held-out test set...
+--------------------------------------------------------------------------------
+Loading binary checkpoint from: checkpoints\xlmr-binary\en
+Evaluating on: data/en_cleaned_test_holdout.csv
+Language: de
+--------------------------------------------------------------------------------
+Binary prediction scoring: 100/1590
+Binary prediction scoring: 200/1590
+Binary prediction scoring: 300/1590
+Binary prediction scoring: 400/1590
+Binary prediction scoring: 500/1590
+Binary prediction scoring: 600/1590
+Binary prediction scoring: 700/1590
+Binary prediction scoring: 800/1590
+Binary prediction scoring: 900/1590
+Binary prediction scoring: 1000/1590
+Binary prediction scoring: 1100/1590
+Binary prediction scoring: 1200/1590
+Binary prediction scoring: 1300/1590
+Binary prediction scoring: 1400/1590
+Binary prediction scoring: 1500/1590
+Binary prediction scoring: 1590/1590
+
+================================================================================
+EVALUATION RESULTS (DIRECT BINARY)
+================================================================================
+Accuracy:          0.8648 (86.48%)
+Positive Precision:0.6349
+Positive Recall:   0.5464
+Positive F1:       0.5873
+
+--------------------------------------------------------------------------------
+CONFUSION MATRIX
+--------------------------------------------------------------------------------
+                    Predicted
+                 Non-AS    AS
+Actual Non-AS     1222     88
+Actual AS          127    153
+
+--------------------------------------------------------------------------------
+CLASSIFICATION REPORT
+--------------------------------------------------------------------------------
+                     precision    recall  f1-score   support
+
+Non-Antisemitic (0)     0.9059    0.9328    0.9191      1310
+    Antisemitic (1)     0.6349    0.5464    0.5873       280
+
+           accuracy                         0.8648      1590
+          macro avg     0.7704    0.7396    0.7532      1590
+       weighted avg     0.8581    0.8648    0.8607      1590
+
+
+================================================================================
+DETAILED ANALYSIS
+================================================================================
+True Positives (Antisemitic correctly identified):  153
+False Positives (Incorrectly labeled antisemitic): 88
+False Negatives (Missed antisemitic texts):        127
+True Negatives (Non-antisemitic correct):          1222
+
+================================================================================
+TRUE POSITIVES - Antisemitic Texts Correctly Identified (showing 10/153)
+================================================================================
+
+[0] Trump as persuaded by alleged ZioNazi Youth Graduate Jared Kushner and Zionist ultra-racist Stephen Miller is continuing to push out the mountain of 'Yuge' lies in a vanishing return of hope of them being accepted as Truth.
+
+[6] . icymi ...\n\nIsraeli Jews Call: “Stop Israel’s Apartheid!”\n#IsraelisAgainstApartheid\nAn Open Letter to the International Community\n\n
+
+[9] The racist comments leave little doubt as to whom your hate-filled Zionazi screeds attract. Sad news for you all, the days of white supremacism in the US and Israel/Palestine are waning. \nWhen Zionists tweet fake news, they double down instead of retracting.
+
+[14] RT : Israel is a state established in 1948 on Palestinian land, it has little to do with Jewish people and Jews are vocal about it. #FreePalestine
+
+[24] ⛅ Without a doubt, #MAGA The best thing about kikes in the near future could have been due to Queenslanders rawr Fad . 🚽 💗 👭 🚩 🆗 🌠 💚 🏤 🎽 📍 3⃣
+
+[26] RT : Zionism has NOTHING to do with Judaism. Zionism is Antisemitism is racism. Not all Jews are Zionists and not all Zionists are Jews ðŸ‘‡ðŸ‘‡
+
+[27] The ongoing protests by Israeli Jews against Netanyahu, are a reflection of Jewish values. Those who conflate the Jewish faith should watch these protests, and understand that the Israeli appartheid , racist regime is not conducive with the Jewish faith.
+
+[51] Of course they’re not America’s closest ally- It’s all p/o the ZioNazi propaganda-Stop giving Zios US bloody Benjamin’s watch what happens! Need to clean the swampiest of swamps in Congress WH- Need ppl w/integrity morals who will tell foreign racist Zio regime where to go!
+
+[69] 🐩 IMO #MAGA The best thing about kikes being overthrown is evidence of the socialist revolution ? Angery . 🚠 ⏪ 👭 💐 😾 💺 ✊ ✨ 🌽 🐗 👓 🗼
+
+[80] Geez, the kikes are everywhere.
+
+================================================================================
+FALSE POSITIVES - Non-Antisemitic Incorrectly Labeled (showing 10/88)
+================================================================================
+
+[78] TRUE LABEL: Non-Antisemitic (0)
+    The world has always falsely blamed the Jews for whatever is considered to be bad. \n\nYou lying about apartheid? We'll be alright.
+
+[82] TRUE LABEL: Non-Antisemitic (0)
+    Which Neptune supposedly saved all th a oriental geisha why won't they admit all black haired black eyed tribes no matter where they're from are originally Egyptian but the whites are the jews with rosetta stone?
+
+[104] TRUE LABEL: Non-Antisemitic (0)
+    What the hell are you doing in #Palestine...!is there not voilance of human rights??goto hell #Israel
+
+[111] TRUE LABEL: Non-Antisemitic (0)
+    I hate fact checkers, but in situations like these they are useful : This tweet is outdated and misleading.
+
+[141] TRUE LABEL: Non-Antisemitic (0)
+    There are many kinds of Jews as there are many types of Muslims. The Quran is not as holy as you think. Read the last sentence.
+
+[153] TRUE LABEL: Non-Antisemitic (0)
+    Hey, When British Occupied Palestine from Turkey, Jews accounted only 3% of the population and yes they were always there but it was after British occupation that Systematic Jewish Migration and Colonisation of of Palestine by Immigrants and Settlers and by Refugees began by UK.
+
+[154] TRUE LABEL: Non-Antisemitic (0)
+    RT : Apparently Israel only ever commits unintentional crimes against the Palestinian ppl. At least thatâ€™s what the DC Establishment is telling us.
+
+[207] TRUE LABEL: Non-Antisemitic (0)
+    I dont think the 2 state solution can work any more We need a unified Israel Palestine with a new name thats a genuine multi ethnic secular democracy Get rid of or curb both Hamas n jihadist groups and militant settlers
+
+[239] TRUE LABEL: Non-Antisemitic (0)
+    RT : Donâ€™t let Israel and their trolls convince you that *all* Jews support Zionism. What a lie! And not only are Jews opposed to Zionism today, but were so from the moment it started! *All* leading Rabbis denounced this atheistic movement! ðŸ‘‡ðŸ‘‡ #Israel #Palestinian #Antisemitism
+
+[268] TRUE LABEL: Non-Antisemitic (0)
+    Communism, Zionism, and the Jews: A Brief Romance.\n\nCommunist parties worldwide, including in the U.S. and Palestine, took their orders from Moscow, which meant that, with one consequential exception, they opposed Zionism.
+
+================================================================================
+FALSE NEGATIVES - Antisemitic Texts Missed (showing 10/127)
+================================================================================
+
+[32] TRUE LABEL: Antisemitic (1)
+    Israel must disappear from Time Of Page✌️\n#covid1948 \n#QodsDay
+
+[57] TRUE LABEL: Antisemitic (1)
+    Israel is trying to win a PR battle through its fake rescue mission in Turkiye via
+
+[67] TRUE LABEL: Antisemitic (1)
+    Bro literally again proving my point. The people that's lived there for years created their their own identity separate from other Arab cultures. Jews Christians Muslims, all Palestinians
+
+[83] TRUE LABEL: Antisemitic (1)
+    Tonight hundreds of British Jews rallied across the country to demand Freedom from Occupation and Freedom from Violence for all in Israel-Palestine.\n\nThis is unprecedented. Change is coming. #EndTheOccupation\n\nCheck out our nationwide protests ⬇️
+
+[113] TRUE LABEL: Antisemitic (1)
+    RT : If saying "Jews control everything" is a nasty, antisemitic stereotype... then erasing a man from every corner of the economy after he says that doesn't exactly disprove said stereotype... does it?
+
+[118] TRUE LABEL: Antisemitic (1)
+    Oh so you think Palestinians deserve rights and that israel should stop committing genocide?? You hate gays and jews.
+
+[142] TRUE LABEL: Antisemitic (1)
+    On the first days of 2014 aggression, â€œIsraelâ€
+
+[172] TRUE LABEL: Antisemitic (1)
+    Oppression is not good anywhere. This has nothing to do with any religion. So it's not important that Palestinian are Muslim or Christians or Jews. It just matters that they are oppressed.\n#القدس_اقرب \n#FreePalestine
+
+--------------------------------------------------------------------------------
+Evaluating German direct binary model on held-out test set...
+--------------------------------------------------------------------------------
+Loading binary checkpoint from: checkpoints\xlmr-binary\de_ft
+Evaluating on: data/de_cleaned_test_holdout.csv
+Language: de
+--------------------------------------------------------------------------------
+Binary prediction scoring: 100/1101
+Binary prediction scoring: 200/1101
+Binary prediction scoring: 300/1101
+Binary prediction scoring: 400/1101
+Binary prediction scoring: 500/1101
+Binary prediction scoring: 600/1101
+Binary prediction scoring: 700/1101
+Binary prediction scoring: 800/1101
+Binary prediction scoring: 900/1101
+Binary prediction scoring: 1000/1101
+Binary prediction scoring: 1100/1101
+Binary prediction scoring: 1101/1101
+
+================================================================================
+EVALUATION RESULTS (DIRECT BINARY)
+================================================================================
+Accuracy:          0.9528 (95.28%)
+Positive Precision:0.4634
+Positive Recall:   0.3878
+Positive F1:       0.4222
+
+--------------------------------------------------------------------------------
+CONFUSION MATRIX
+--------------------------------------------------------------------------------
+                    Predicted
+                 Non-AS    AS
+Actual Non-AS     1030     22
+Actual AS           30     19
+
+--------------------------------------------------------------------------------
+CLASSIFICATION REPORT
+--------------------------------------------------------------------------------
+                     precision    recall  f1-score   support
+
+Non-Antisemitic (0)     0.9717    0.9791    0.9754      1052
+    Antisemitic (1)     0.4634    0.3878    0.4222        49
+
+           accuracy                         0.9528      1101
+          macro avg     0.7176    0.6834    0.6988      1101
+       weighted avg     0.9491    0.9528    0.9508      1101
+
+
+================================================================================
+DETAILED ANALYSIS
+================================================================================
+True Positives (Antisemitic correctly identified):  19
+False Positives (Incorrectly labeled antisemitic): 22
+False Negatives (Missed antisemitic texts):        30
+True Negatives (Non-antisemitic correct):          1030
+
+================================================================================
+TRUE POSITIVES - Antisemitic Texts Correctly Identified (showing 10/19)
+================================================================================
+
+[79] Die #Apartheid #Israel 🇮🇱 wird in Zukunft #Kriegsverbrechen Verbrechen gegen die Menschlichkeit begehen, davon ist auszugehen! Werden die Pro-Zionisten Philosemiten in der BRD diese relativieren? Kommt dann die Gesetzesänderung des #Volksverhetzung's-Paragraph 130 zum tragen?
+
+[98] Es geht nicht um Juden, sondern Israelis, genauer um Zionisten. Der aktuelle Konflikt wurde (mal wieder) durch Israels provoziert. Das mal völlig unabhängig von der Geschichte der Staatsgründung und Israels Sechs-Tage-Angriffskrieg mit anschließender Besetzung fremder Gebiete.
+
+[183] RT : 3. Faschismus-Stufe nach Paxton Übernahme der Macht Trump, Orban, Gewalt gegen Linke/Andersdenkende #NetzDG systemfinanzierte Kahane-Zensur, israel. Zionismus, von der Leyen/EU
+
+[300] Nazi Israel
+
+[338] Der Apartheidstaat #Israel mordet, massakriert und vertreibt seit seiner Gründung die Araber in Palästina. Alles um ihre rassistische Utopie eines reinen jüdischen Staates zu verwirklichen.\n#Holocaust #Abbas
+
+[369] Die Auseinandersetzung zwischen Palästinensern und Israel ist kein Konflikt, sondern Ethnische Säuberung. Das ist die Ideologie des zionistischen Siedlerkolonialismus\n1948 #Nakba und Edward Said schrieb angesichts des Oslo Abkommen vom Ende der Zwei-Staaten-Lösung
+
+[376] Israel sagt, wir sind in unser Land Palästina zurückgekehrt, das Töten ist unser Recht\nDie Ukraine war auch ein Teil von Russland!\nAber das letzte Mal, als Moses den Juden sagte dass sie nicht nach Palästina gehen sollen haben sie sogar ihren Propheten verraten!\n#racism\n#Ukraine
+
+[428] 7 Das soll nicht heißen,dass gar keine Juden aus arabischen Ländern vertrieben wurden,aber die Hasbara-Zahlen des Siedlerkolonial- u Apartheidstaates sind überzogen.Dein Whataboutism war nur eine Nebelkerze, um von den 75J andauernden Verbrechen an den Palästinensern abzulenken.
+
+[480] Ohhh jaaa da fällt mir doch glatt dieses Bild ein! Frage mich dann allen Ernstes: Als AM der Antrittsbesuch in ISRAEL ...Was ist denn Netanjahu für Sie der Palästina soooo behandelt ihr die BuRe dazu schweigt! Alles nur noch abartig solche heuchlerische Politiker :-)
+
+[522] Memo an Verunsicherte:\n\n“Den Antisemitismus bekämpfen, was *jeder* tun sollte, bedeutet natürlich NICHT, die Aktionen des Staates Israel unterstützen zu müssen, der den Palästinensern Apartheid auferlegt sie verfolgt.\n\nViele Juden sind sehr dagegen, wie Israel täglich handelt.”
+
+================================================================================
+FALSE POSITIVES - Non-Antisemitic Incorrectly Labeled (showing 10/22)
+================================================================================
+
+[18] TRUE LABEL: Non-Antisemitic (0)
+    Die 🇺🇦 stimmt in der UN für eine int'l Untersuchung der anhaltenden Besetzung Palästinas durch Israel = \n verärgert\n\nDanke 🇺🇦. \nDie zerstörten Häuser v. #Mariupol erinnern stark an jeden v. #Gaza\n\nBTW: 🇦🇹 hat dagegen gestimmt\n\nBesatzer sind hässlich, grausam, brutal..überall
+
+[62] TRUE LABEL: Non-Antisemitic (0)
+    RT : »Nicht alle Israelis sind Zionisten. Nicht alle Zionisten sind Israelis. Nicht alle Juden sind Zionisten.« Esthe…
+
+[64] TRUE LABEL: Non-Antisemitic (0)
+    Junge Juden verlassen wütend und traurig unser Land...wie können wir das zulassen???
+
+[99] TRUE LABEL: Non-Antisemitic (0)
+    Es geht wieder los. 😔\n#Israel
+
+[113] TRUE LABEL: Non-Antisemitic (0)
+    Nicht nur im Gaza schränkt Israel die Lebensqualität ein sondern auch in der Westbank.
+
+[133] TRUE LABEL: Non-Antisemitic (0)
+    Verflucht sei Israel. Sie sind mit dem, was sie haben, nicht zufrieden und wollen mehr.
+
+[158] TRUE LABEL: Non-Antisemitic (0)
+    Wo beleidigt er juden
+
+[200] TRUE LABEL: Non-Antisemitic (0)
+    #Heuchler!!\n\nDie ganzen Kriegsverbrechen die die USA oder israel begehen sind aber in Ordnung. Ihr Heuchler!\n\nDie Menschheit darf sich nicht mehr länger über die Religion oder Nationalität spalten und aufhetzen lassen!\n\nSehenswert \n\n
+
+[205] TRUE LABEL: Non-Antisemitic (0)
+    Ginge es dem #Bundestag wirklich um Völkerrecht, würde sich die "ehrenwerte Gesellschaft" für die Entstehung eines kurdischen Staates, Unabhängigkeit Tibets, oder Rückzug der Türkei aus Zypern mit der gleichen Intensität einsetzen, wie sie #Israel-Bashing betreibt ! #Annexion
+
+[360] TRUE LABEL: Non-Antisemitic (0)
+    Das sind die differenzierten Stimmen, die mir oft fehlen!\nMan kann sowohl die israelische Besatzungs- und Siedlungspolitik, als auch Rassismus gegen israelische Araber kritisieren, ohne dem Staat Israel einseitig und propagandistisch "Apartheid" vorzuwerfen.
+
+================================================================================
+FALSE NEGATIVES - Antisemitic Texts Missed (showing 10/30)
+================================================================================
+
+[12] TRUE LABEL: Antisemitic (1)
+    Wir sollten auch aufhören das Völkerrecht als Antisemitismus zu bezeichnen. Isarel und Palästina schffen es nichtv mehr zum Völkerrecht, genau wie Deutschland, als man ähnlich wie in Jerusalem 1938 in Berlin rief "Tod den Juden!" Völkerrecht muss her, UN hin.
+
+[35] TRUE LABEL: Antisemitic (1)
+    Hey : letzten Freitag habt ihr 120k Unterschriften von uns erhalten, die euch auffordern, den Vertrag mit der Israel Football Association zu beenden -- werdet ihr handeln, #PUMAfa? Oder wegschauen? #nosupportforapartheid
+
+[49] TRUE LABEL: Antisemitic (1)
+    Deutschland im Einsatz auf dem Stützpunkt mit Geschichte, zusammen mit den "Roten zionistischen Baronen" der mörderischen "Davidstern-Verteidigungssoldaten". Da passt doch die...
+
+[60] TRUE LABEL: Antisemitic (1)
+    Echt so ein behindert. Dieses Trump-Juden Meme geht auch nicht auf. Medien, ADL und wie sie heissen sind ja alle gegen ihn. Und da sind fast nur Juden in den leitenden Positionen
+
+[77] TRUE LABEL: Antisemitic (1)
+    Dabei sehen ein grossteil der sich selbst als aufgeweckt bezeichnenden nicht mal das soviele Juden dahinter stecken da Ihre pro Juedische Programmierung zu stark ist
+
+[80] TRUE LABEL: Antisemitic (1)
+    "Israel" wurde halt nicht so angelegt, der Zionismus kannte von Anfang an nur Vorherrschaft durch Gewalt.
+
+[111] TRUE LABEL: Antisemitic (1)
+    Beyond Chutzpah! By Norman Finkelstein\n\n #BeyondChutzpah #Israel #Palestine #Gaza #RadicalJews #Criticism #Holocaust #SouthAfricanApartheid #NormanFinklestein #MainstreamMedia #WesternMedia #Antisemitism #IsraeliNarrative #PalestinianNarrative
+
+[186] TRUE LABEL: Antisemitic (1)
+    Haben nicht Juden die eingeladen und Ihnen wiederholt die Tore geöffnet?\nBtw. der reichs-korrekte Begriff ist Anit-Judaismus, machen schliesslich nicht alle Semiten aus.
+
+[207] TRUE LABEL: Antisemitic (1)
+    die Faszination, die von Ethnofaschisten ausgeht, muss unbeschreiblich sein - Hauptsache, Israel segnet es ab, wie? - aber diese Bande irritiert selbst dort
+
+[257] TRUE LABEL: Antisemitic (1)
+    Das hat auch nichts mit der Religion zu tun.\nEs gibt ein Palästina, indem Muslims, Juden und Christen kooperativ zusammen gelebt haben. Selbst arabische Juden werden in Israel diskriminiert.\nNazi Trolle wissen nicht mal, wo die drei monotheistischen Religionen entstanden sind.
+
+================================================================================
+TRAINING COMPLETE
+================================================================================

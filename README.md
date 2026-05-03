@@ -15,11 +15,9 @@ The CLI supports three training modes. Pick exactly one.
 
 | Mode | Flag | What it does | Output dir |
 |---|---|---|---|
-| Two-stage (legacy) | (default) | Train on EN, then fine-tune on DE | `checkpoints/xlmr-nli/` (EN), `checkpoints/xlmr-nli/de_ft/` (DE) |
+| Two-stage  | (default) | Train on EN, then fine-tune on DE | `checkpoints/xlmr-nli/` (EN), `checkpoints/xlmr-nli/de_ft/` (DE) |
 | German only | `--de_only` | Single stage on DE | `checkpoints/xlmr-nli/de_only/` |
-| **Joint EN+DE** (recommended) | `--joint_train` | Single stage on EN + DE concatenated | `checkpoints/xlmr-nli/joint/` |
-
-The two-stage mode systematically over-writes the EN-trained representation during DE fine-tuning, which hurts DE performance because DE has very few positives (~4 %). Joint training keeps both languages' gradients flowing into the same model and consistently delivers the best DE F1 in our runs.
+| Joint EN+DE | `--joint_train` | Single stage on EN + DE concatenated | `checkpoints/xlmr-nli/joint/` |
 
 ---
 
@@ -309,19 +307,3 @@ Per training run the output dir contains:
 | `train.log` | Full stdout/stderr of the run |
 
 Inference loads `decision_config.json` (or a language-specific variant if available) and applies the decision rule from Section 4.
-
----
-
-## 10. Practical Notes
-
-- **DE has only ~335 positives total**; with a 70/15/15 split that's ~235 / 49 / 49. Tweet-level F1 can swing ±3 percentage points purely from sample variance.
-- **Positive recall and precision must be tracked together** — overall accuracy is dominated by the negative class and uninformative.
-- **Threshold collapse** to extreme negative values (predict everything positive) was a real failure mode under `recall_at_precision` with low `min_precision`. Current defaults (`f1`, search range `[-0.2, 0.8]`) prevent this.
-- **The biggest remaining lever** is the data: more DE positives, label-quality review, or pseudo-labels via translation of EN positives. The pipeline itself is well-tuned at this point.
-
-## 11. Troubleshooting
-
-- **Threshold calibration says `constraint_satisfied=False`** → no threshold reached `min_precision`. Either lower `--threshold_min_precision` or accept the fallback (recall-optimal).
-- **Training appears stuck after `trainer.train()` finishes** → tweet-level checkpoint sweep + threshold calibration are running; both perform full-validation scoring loops with progress logs.
-- **DE F1 stuck around 0.35–0.40** → likely a data ceiling, not a hyperparameter problem. See Section 10.
-- **`--epochs N` ignored** → confirm you're not also passing `--de_only` to a multi-stage command; mode flags are exclusive.

@@ -5,7 +5,7 @@ from tkinter import NONE
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import f1_score, precision_score, recall_score, confusion_matrix, classification_report
 from sklearn.model_selection import train_test_split
 from transformers import (
     AutoModelForSequenceClassification,
@@ -16,7 +16,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 import evaluate
-from datasets import DatasetDict
+from datasets import Dataset, DatasetDict
 from .dataset import load_binary_dataframe, dataframe_to_nli_dataset, oversample_positive_rows
 from .hypotheses import NLI_LABEL2ID
 from .tokenizer_utils import load_tokenizer
@@ -142,6 +142,164 @@ def tokenize_fn(examples, tokenizer):
     if "lang_id" in examples:
         encoded["lang_id"] = examples["lang_id"]
     return encoded
+
+
+def tokenize_binary_fn(examples, tokenizer):
+    """Tokenize single-text binary classification samples."""
+    encoded = tokenizer(examples["text"], truncation=True)
+    encoded["labels"] = examples["labels"]
+    return encoded
+
+
+def dataframe_to_binary_dataset(df: pd.DataFrame) -> Dataset:
+    """Convert tweet-level dataframe to a 2-class dataset for direct classification."""
+    out_df = pd.DataFrame(
+        {
+            "text": df["Text"].astype(str).tolist(),
+            "labels": df["Biased"].astype(int).tolist(),
+        }
+    )
+    return Dataset.from_pandas(out_df, preserve_index=False)
+
+
+def compute_metrics_binary(eval_pred):
+    """Metrics for direct 2-class tweet classification."""
+    logits, labels = eval_pred
+    preds = np.argmax(logits, axis=-1)
+    acc = float(np.mean(preds == labels))
+    p = float(precision_score(labels, preds, zero_division=0))
+    r = float(recall_score(labels, preds, zero_division=0))
+    f1 = float(f1_score(labels, preds, zero_division=0))
+    return {
+        "accuracy": acc,
+        "precision_pos": p,
+        "recall_pos": r,
+        "f1": f1,
+    }
+
+
+@torch.no_grad()
+def evaluate_binary_with_analysis(
+    checkpoint_path: str,
+    test_csv: str,
+    show_examples: int = 10,
+):
+    """Evaluate a direct binary text classifier (non-NLI) on held-out tweet data."""
+    print(f"Loading binary checkpoint from: {checkpoint_path}")
+    print(f"Evaluating on: {test_csv}")
+    print("Language: de")
+    print("-" * 80)
+
+    tokenizer = load_tokenizer(checkpoint_path)
+    model = AutoModelForSequenceClassification.from_pretrained(checkpoint_path, num_labels=2)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()
+
+    df = pd.read_csv(test_csv).dropna(subset=["Text", "Biased"]).copy()
+    texts = df["Text"].astype(str).tolist()
+    y_true = df["Biased"].astype(int).to_numpy()
+
+    y_pred = []
+    for i, text in enumerate(texts, start=1):
+        enc = tokenizer(text, return_tensors="pt", truncation=True)
+        enc = {k: v.to(device) for k, v in enc.items()}
+        logits = model(**enc).logits[0]
+        pred = int(torch.argmax(logits).item())
+        y_pred.append(pred)
+        if i % 100 == 0 or i == len(texts):
+            print(f"Binary prediction scoring: {i}/{len(texts)}")
+
+    y_pred = np.array(y_pred)
+    accuracy = float(np.mean(y_pred == y_true))
+    precision_pos = float(precision_score(y_true, y_pred, zero_division=0))
+    recall_pos = float(recall_score(y_true, y_pred, zero_division=0))
+    f1_pos = float(f1_score(y_true, y_pred, zero_division=0))
+    cm = confusion_matrix(y_true, y_pred)
+    report = classification_report(
+        y_true,
+        y_pred,
+        target_names=["Non-Antisemitic (0)", "Antisemitic (1)"],
+        digits=4,
+    )
+
+    print("\n" + "=" * 80)
+    print("EVALUATION RESULTS (DIRECT BINARY)")
+    print("=" * 80)
+    print(f"Accuracy:          {accuracy:.4f} ({accuracy * 100:.2f}%)")
+    print(f"Positive Precision:{precision_pos:.4f}")
+    print(f"Positive Recall:   {recall_pos:.4f}")
+    print(f"Positive F1:       {f1_pos:.4f}")
+
+    print("\n" + "-" * 80)
+    print("CONFUSION MATRIX")
+    print("-" * 80)
+    print("                    Predicted")
+    print("                 Non-AS    AS")
+    print(f"Actual Non-AS   {cm[0][0]:6d}  {cm[0][1]:5d}")
+    print(f"Actual AS       {cm[1][0]:6d}  {cm[1][1]:5d}")
+
+    print("\n" + "-" * 80)
+    print("CLASSIFICATION REPORT")
+    print("-" * 80)
+    print(report)
+
+    df["Predicted"] = y_pred
+    tp = df[(df["Biased"] == 1) & (df["Predicted"] == 1)]
+    fp = df[(df["Biased"] == 0) & (df["Predicted"] == 1)]
+    fn = df[(df["Biased"] == 1) & (df["Predicted"] == 0)]
+    tn = df[(df["Biased"] == 0) & (df["Predicted"] == 0)]
+
+    print("\n" + "=" * 80)
+    print("DETAILED ANALYSIS")
+    print("=" * 80)
+    print(f"True Positives (Antisemitic correctly identified):  {len(tp)}")
+    print(f"False Positives (Incorrectly labeled antisemitic): {len(fp)}")
+    print(f"False Negatives (Missed antisemitic texts):        {len(fn)}")
+    print(f"True Negatives (Non-antisemitic correct):          {len(tn)}")
+
+    if len(tp) > 0:
+        print("\n" + "=" * 80)
+        print(
+            "TRUE POSITIVES - Antisemitic Texts Correctly Identified "
+            f"(showing {min(show_examples, len(tp))}/{len(tp)})"
+        )
+        print("=" * 80)
+        for idx, row in tp.head(show_examples).iterrows():
+            print(f"\n[{idx}] {row['Text']}")
+
+    if len(fp) > 0:
+        print("\n" + "=" * 80)
+        print(
+            "FALSE POSITIVES - Non-Antisemitic Incorrectly Labeled "
+            f"(showing {min(show_examples, len(fp))}/{len(fp)})"
+        )
+        print("=" * 80)
+        for idx, row in fp.head(show_examples).iterrows():
+            print(f"\n[{idx}] TRUE LABEL: Non-Antisemitic (0)")
+            print(f"    {row['Text']}")
+
+    if len(fn) > 0:
+        print("\n" + "=" * 80)
+        print(
+            "FALSE NEGATIVES - Antisemitic Texts Missed "
+            f"(showing {min(show_examples, len(fn))}/{len(fn)})"
+        )
+        print("=" * 80)
+        for idx, row in fn.head(show_examples).iterrows():
+            print(f"\n[{idx}] TRUE LABEL: Antisemitic (1)")
+            print(f"    {row['Text']}")
+
+    return {
+        "accuracy": accuracy,
+        "precision_pos": precision_pos,
+        "recall_pos": recall_pos,
+        "f1_pos": f1_pos,
+        "true_positives": len(tp),
+        "false_positives": len(fp),
+        "false_negatives": len(fn),
+        "true_negatives": len(tn),
+    }
 
 
 _F1_METRIC = None
@@ -900,23 +1058,86 @@ def train_joint_stage(
         ))
         trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=5))
 
+    # Track run start so we can identify checkpoints written by this run.
+    run_start_ts = time.time()
+
     trainer.train()
     best_dir = args.output_dir
     trainer.save_model(best_dir)
     tokenizer.save_pretrained(best_dir)
 
-    # Per-language threshold calibration: save default config bound to DE,
-    # plus an EN-specific config in the same checkpoint dir.
+    # Collect candidate checkpoints from this run for per-language selection.
+    current_checkpoints: list[str] = []
+    if os.path.isdir(args.output_dir):
+        for name in os.listdir(args.output_dir):
+            path = os.path.join(args.output_dir, name)
+            if not (os.path.isdir(path) and name.startswith("checkpoint-")):
+                continue
+            mtime = _checkpoint_last_write_time(path)
+            if mtime >= run_start_ts - 1.0:
+                current_checkpoints.append(path)
+    current_checkpoints.sort(key=lambda p: int(os.path.basename(p).split("-")[-1]))
+    if cfg.model_selection_last_k_checkpoints > 0 and len(current_checkpoints) > cfg.model_selection_last_k_checkpoints:
+        current_checkpoints = current_checkpoints[-cfg.model_selection_last_k_checkpoints:]
+
+    run_candidates: list[str] = []
+    if trainer.state.best_model_checkpoint and os.path.isdir(trainer.state.best_model_checkpoint):
+        run_candidates.append(trainer.state.best_model_checkpoint)
+    for p in current_checkpoints:
+        if p not in run_candidates:
+            run_candidates.append(p)
+
+    # Per-language: select best checkpoint by tweet-level objective on that
+    # language's validation set, copy it into best_<lang>/ subdir, calibrate the
+    # decision threshold there, and save a per-language decision config.
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    per_lang_best_dirs: dict[str, str] = {}
     for lang_code, val_df_l in [("en", en_val_df), ("de", de_val_df)]:
         if val_df_l is None or len(val_df_l) == 0:
             continue
-        print(f"\nCalibrating {lang_code.upper()} positive decision threshold on validation tweets...")
         val_texts_l = [str(x) for x in val_df_l["Text"].tolist()]
         val_labels_l = [int(x) for x in val_df_l["Biased"].tolist()]
+
+        print(
+            f"\nSelecting best checkpoint for {lang_code.upper()} from "
+            f"{len(run_candidates)} candidate(s)..."
+        )
+        selected_ckpt, selected_metrics = _select_best_checkpoint_by_tweet_objective(
+            output_dir=args.output_dir,
+            val_texts=val_texts_l,
+            val_labels=val_labels_l,
+            lang=lang_code,
+            tokenizer=tokenizer,
+            cfg=cfg,
+            num_labels=num_labels,
+            candidate_checkpoints=run_candidates if run_candidates else None,
+        )
+        print(
+            f"[{lang_code.upper()}] Tweet-level checkpoint selection: "
+            f"objective={cfg.model_selection_objective} "
+            f"min_precision={cfg.model_selection_min_precision:.2f} "
+            f"selected='{selected_ckpt}' "
+            f"p={selected_metrics['precision']:.4f} "
+            f"r={selected_metrics['recall']:.4f} "
+            f"f1={selected_metrics['f1']:.4f} "
+            f"constraint_satisfied={selected_metrics['constraint_satisfied']}"
+        )
+
+        lang_best_dir = os.path.join(best_dir, f"best_{lang_code}")
+        os.makedirs(lang_best_dir, exist_ok=True)
+        chosen_model = AutoModelForSequenceClassification.from_pretrained(selected_ckpt, num_labels=num_labels)
+        chosen_model.to(device)
+        chosen_model.eval()
+        chosen_model.save_pretrained(lang_best_dir)
+        tokenizer.save_pretrained(lang_best_dir)
+
+        print(
+            f"\nCalibrating {lang_code.upper()} positive decision threshold on validation tweets "
+            f"(best ckpt: {os.path.basename(selected_ckpt)})..."
+        )
         thr_res = tune_positive_margin_threshold(
             texts=val_texts_l, true_labels=val_labels_l, lang=lang_code,
-            tokenizer=tokenizer, model=trainer.model, device=device,
+            tokenizer=tokenizer, model=chosen_model, device=device,
             objective=cfg.threshold_objective,
             threshold_min=cfg.threshold_search_min, threshold_max=cfg.threshold_search_max,
             min_precision=cfg.threshold_min_precision,
@@ -925,7 +1146,15 @@ def train_joint_stage(
             nli_train_mode=cfg.nli_train_mode,
             progress_label=f"{lang_code.upper()} threshold calibration",
         )
-        # Default config = primary language for best metric.
+        # Save the canonical decision_config.json inside the per-language best dir.
+        save_decision_config(
+            ckpt_dir=lang_best_dir,
+            positive_margin_threshold=thr_res["threshold"],
+            contradiction_weight=cfg.contradiction_weight,
+            score_mode=cfg.score_mode, nli_train_mode=cfg.nli_train_mode,
+            objective=cfg.threshold_objective, validation_metrics=thr_res,
+        )
+        # Default config in joint root = primary language (for backward compat).
         if lang_code == cfg.joint_eval_lang_for_best:
             save_decision_config(
                 ckpt_dir=best_dir,
@@ -934,7 +1163,7 @@ def train_joint_stage(
                 score_mode=cfg.score_mode, nli_train_mode=cfg.nli_train_mode,
                 objective=cfg.threshold_objective, validation_metrics=thr_res,
             )
-        # Always also write per-language config for inference flexibility.
+        # Per-lang reference config in joint root.
         per_lang_path = os.path.join(best_dir, f"decision_config_{lang_code}.json")
         with open(per_lang_path, "w", encoding="utf-8") as f:
             json.dump({
@@ -944,15 +1173,119 @@ def train_joint_stage(
                 "nli_train_mode": str(cfg.nli_train_mode),
                 "objective": cfg.threshold_objective,
                 "lang": lang_code,
+                "selected_checkpoint": selected_ckpt,
+                "best_lang_dir": lang_best_dir,
                 "validation_metrics": thr_res,
             }, f, indent=2, ensure_ascii=True)
         print(
-            f"{lang_code.upper()} threshold: thr={thr_res['threshold']:.4f} "
+            f"[{lang_code.upper()}] threshold: thr={thr_res['threshold']:.4f} "
             f"p={thr_res['precision']:.4f} r={thr_res['recall']:.4f} f1={thr_res['f1']:.4f} "
             f"constraint_satisfied={thr_res.get('constraint_satisfied', True)}"
         )
+        per_lang_best_dirs[lang_code] = lang_best_dir
 
-    return best_dir, en_test_csv, de_test_csv
+        del chosen_model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    return best_dir, en_test_csv, de_test_csv, per_lang_best_dirs
+
+
+def train_binary_stage(
+    train_csv: str,
+    val_csv: str,
+    lang: str,
+    cfg: Config,
+    resume_from: str | None = None,
+    val_size: float | None = None,
+    hold_test_size: float | None = None,
+):
+    """
+    Direct 2-class tweet classifier training (non-NLI baseline).
+
+    Returns:
+        Tuple of (checkpoint_path, test_csv_path, lang)
+    """
+    source_model = resume_from if resume_from else cfg.model_name
+    tokenizer = load_tokenizer(source_model)
+
+    train_df, val_df, test_df, test_csv_path = _prepare_tweet_level_splits(
+        train_csv=train_csv,
+        val_csv=val_csv,
+        val_size=val_size,
+        hold_test_size=hold_test_size,
+        seed=cfg.seed,
+    )
+
+    if lang == "en":
+        oversample_factor = float(cfg.en_pos_oversample_factor)
+    else:
+        oversample_factor = float(cfg.de_pos_oversample_factor)
+
+    if oversample_factor > 1.0:
+        train_df = oversample_positive_rows(train_df, factor=oversample_factor, seed=cfg.seed)
+        print(f"Applied positive oversampling factor: {oversample_factor:.2f}")
+
+    print("\nTweet-level split summary (direct binary)")
+    _print_class_distribution("Train", train_df)
+    if val_df is not None:
+        _print_class_distribution("Validation", val_df)
+    if test_df is not None:
+        _print_class_distribution("Test", test_df)
+
+    train_ds = dataframe_to_binary_dataset(train_df)
+    val_ds = dataframe_to_binary_dataset(val_df) if val_df is not None else None
+    ds_dict = DatasetDict({"train": train_ds, "validation": val_ds}) if val_ds else DatasetDict({"train": train_ds})
+    tokenized = ds_dict.map(
+        lambda ex: tokenize_binary_fn(ex, tokenizer),
+        batched=True,
+        remove_columns=ds_dict["train"].column_names,
+    )
+
+    model = AutoModelForSequenceClassification.from_pretrained(source_model, num_labels=2)
+    data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
+
+    args = TrainingArguments(
+        output_dir=cfg.output_dir,
+        learning_rate=cfg.lr,
+        per_device_train_batch_size=cfg.batch_size,
+        per_device_eval_batch_size=cfg.batch_size,
+        gradient_accumulation_steps=cfg.gradient_accumulation_steps,
+        num_train_epochs=cfg.epochs,
+        weight_decay=cfg.weight_decay,
+        warmup_ratio=cfg.warmup_ratio,
+        eval_strategy="steps" if val_ds else "no",
+        save_strategy="steps" if val_ds else "no",
+        logging_steps=100,
+        save_steps=300,
+        eval_steps=300,
+        load_best_model_at_end=True if val_ds else False,
+        metric_for_best_model="eval_f1",
+        greater_is_better=True,
+        save_total_limit=10,
+        seed=cfg.seed,
+        report_to=[],
+    )
+
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=tokenized["train"],
+        eval_dataset=tokenized["validation"] if val_ds else None,
+        tokenizer=tokenizer,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics_binary if val_ds else None,
+    )
+
+    if val_ds:
+        trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=5))
+
+    trainer.train()
+    best_dir = args.output_dir
+    trainer.save_model(best_dir)
+    tokenizer.save_pretrained(best_dir)
+
+    return best_dir, test_csv_path, lang
 
 
 class JointTweetLevelCheckpointEvalCallback(TrainerCallback):
@@ -1205,15 +1538,37 @@ if __name__ == "__main__":
         help="Number of error examples to show in evaluation (default: 10)",
     )
     parser.add_argument(
+        "--binary_train",
+        action="store_true",
+        help="Train direct binary classifier in two stages: EN pretraining then DE fine-tuning (no NLI).",
+    )
+    parser.add_argument(
         "--de_only",
         action="store_true",
         help="Train only on German data (no English pretraining stage).",
+    )
+    parser.add_argument(
+        "--de_only_roberta",
+        action="store_true",
+        help="Train DE-only direct binary classifier (no NLI hypotheses, RoBERTa/XLM-R baseline).",
     )
     parser.add_argument(
         "--de_only_output_dir",
         type=str,
         default=os.path.join("checkpoints", "xlmr-nli", "de_only"),
         help="Output directory used when --de_only is enabled.",
+    )
+    parser.add_argument(
+        "--de_only_roberta_output_dir",
+        type=str,
+        default=os.path.join("checkpoints", "xlmr-binary", "de_only"),
+        help="Output directory used when --de_only_roberta is enabled.",
+    )
+    parser.add_argument(
+        "--binary_output_dir",
+        type=str,
+        default=os.path.join("checkpoints", "xlmr-binary"),
+        help="Root output directory used when --binary_train is enabled.",
     )
     parser.add_argument(
         "--joint_train",
@@ -1249,8 +1604,10 @@ if __name__ == "__main__":
 
     if not args_.de_train:
         parser.error("--de_train is required")
-    if not args_.de_only and not args_.en_train:
-        parser.error("--en_train is required unless --de_only is set")
+    if not args_.de_only and not args_.de_only_roberta and not args_.binary_train and not args_.en_train:
+        parser.error("--en_train is required unless --de_only, --de_only_roberta, or --binary_train is set")
+    if args_.binary_train and not args_.en_train:
+        parser.error("--en_train is required when --binary_train is set")
 
     cfg_overrides = {
         "model_name": args_.model_name,
@@ -1282,7 +1639,15 @@ if __name__ == "__main__":
     }
     cfg = Config(**{k: v for k, v in cfg_overrides.items() if v is not None})
 
-    default_log_dir = args_.de_only_output_dir if args_.de_only else (args_.joint_output_dir if args_.joint_train else cfg.output_dir)
+    default_log_dir = (
+        args_.binary_output_dir
+        if args_.binary_train
+        else (
+            args_.de_only_roberta_output_dir
+            if args_.de_only_roberta
+            else (args_.de_only_output_dir if args_.de_only else (args_.joint_output_dir if args_.joint_train else cfg.output_dir))
+        )
+    )
     log_file = args_.log_file if args_.log_file else os.path.join(default_log_dir, "train.log")
 
     with redirect_output_to_log(log_file):
@@ -1293,7 +1658,7 @@ if __name__ == "__main__":
             print("JOINT EN+DE TRAINING (single stage)")
             print("=" * 80)
             cfg.output_dir = args_.joint_output_dir
-            joint_out, en_test_csv, de_test_csv = train_joint_stage(
+            joint_out, en_test_csv, de_test_csv, per_lang_best_dirs = train_joint_stage(
                 en_train_csv=args_.en_train,
                 de_train_csv=args_.de_train,
                 cfg=cfg,
@@ -1308,8 +1673,10 @@ if __name__ == "__main__":
                     print("\n" + "-" * 80)
                     print("Evaluating EN test set...")
                     print("-" * 80)
+                    en_eval_dir = per_lang_best_dirs.get("en", joint_out)
+                    print(f"Using EN best checkpoint dir: {en_eval_dir}")
                     evaluate_with_analysis(
-                        joint_out, en_test_csv, "en",
+                        en_eval_dir, en_test_csv, "en",
                         show_examples=args_.show_examples,
                         class_0_weight=cfg.class_0_weight,
                     )
@@ -1317,11 +1684,91 @@ if __name__ == "__main__":
                     print("\n" + "-" * 80)
                     print("Evaluating DE test set...")
                     print("-" * 80)
+                    de_eval_dir = per_lang_best_dirs.get("de", joint_out)
+                    print(f"Using DE best checkpoint dir: {de_eval_dir}")
                     evaluate_with_analysis(
-                        joint_out, de_test_csv, "de",
+                        de_eval_dir, de_test_csv, "de",
                         show_examples=args_.show_examples,
                         class_0_weight=cfg.class_0_weight,
                     )
+        elif args_.binary_train:
+            print("\n" + "=" * 80)
+            print("STAGE 1: ENGLISH TRAINING (DIRECT BINARY, NO NLI)")
+            print("=" * 80)
+            cfg.output_dir = os.path.join(args_.binary_output_dir, "en")
+            en_out, en_test_csv, en_lang = train_binary_stage(
+                args_.en_train,
+                args_.en_val,
+                "en",
+                cfg,
+                resume_from=None,
+                val_size=args_.val_size,
+                hold_test_size=args_.test_size,
+            )
+
+            print("\n" + "=" * 80)
+            print("STAGE 2: GERMAN FINE-TUNING (DIRECT BINARY, NO NLI)")
+            print("=" * 80)
+            cfg.output_dir = os.path.join(args_.binary_output_dir, "de_ft")
+            de_out, de_test_csv, de_lang = train_binary_stage(
+                args_.de_train,
+                args_.de_val,
+                "de",
+                cfg,
+                resume_from=en_out,
+                val_size=args_.val_size,
+                hold_test_size=args_.test_size,
+            )
+
+            if not args_.skip_evaluation:
+                print("\n" + "=" * 80)
+                print("FINAL EVALUATION ON HELD-OUT TEST SETS")
+                print("=" * 80)
+                if en_test_csv is not None:
+                    print("\n" + "-" * 80)
+                    print("Evaluating English direct binary model on held-out test set...")
+                    print("-" * 80)
+                    evaluate_binary_with_analysis(
+                        en_out,
+                        en_test_csv,
+                        show_examples=args_.show_examples,
+                    )
+                if de_test_csv is not None:
+                    print("\n" + "-" * 80)
+                    print("Evaluating German direct binary model on held-out test set...")
+                    print("-" * 80)
+                    evaluate_binary_with_analysis(
+                        de_out,
+                        de_test_csv,
+                        show_examples=args_.show_examples,
+                    )
+        elif args_.de_only_roberta:
+            print("\n" + "=" * 80)
+            print("GERMAN TRAINING (DE-ONLY DIRECT BINARY, NO NLI)")
+            print("=" * 80)
+            cfg.output_dir = args_.de_only_roberta_output_dir
+            de_out, de_test_csv, de_lang = train_binary_stage(
+                args_.de_train,
+                args_.de_val,
+                "de",
+                cfg,
+                resume_from=None,
+                val_size=args_.val_size,
+                hold_test_size=args_.test_size,
+            )
+
+            if not args_.skip_evaluation and de_test_csv is not None:
+                print("\n" + "=" * 80)
+                print("FINAL EVALUATION ON HELD-OUT TEST SET")
+                print("=" * 80)
+                print("\n" + "-" * 80)
+                print("Evaluating German direct binary model on held-out test set...")
+                print("-" * 80)
+                evaluate_binary_with_analysis(
+                    de_out,
+                    de_test_csv,
+                    show_examples=args_.show_examples,
+                )
         elif args_.de_only:
             print("\n" + "=" * 80)
             print("GERMAN TRAINING (DE-ONLY, NO ENGLISH PRETRAINING)")

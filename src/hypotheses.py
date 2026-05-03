@@ -20,6 +20,11 @@ HYPOTHESES = {
             
             # 🔴 Holocaust
             "Der Text leugnet, verharmlost oder verzerrt die historischen Fakten des Holocaust.",
+            "Der Text macht Witze über die Ermordung von Juden oder verharmlost den Holocaust durch verharmlosende Vergleiche.",
+
+            # 🔴 Codes, Slurs & Delegitimierung des Antisemitismus-Vorwurfs
+            "Der Text verwendet Slurs, Codewörter oder verschleierte Bezeichnungen für Juden (z. B. 'Goblins', 'Kikes', '(((…)))', 'globale Elite', 'Strippenzieher').",
+            "Der Text behauptet, der Antisemitismus-Vorwurf werde missbraucht, um legitime Israel-Kritik zu unterdrücken.",
         ],
         "en": [
             # 🔴 Hostility & Dehumanization
@@ -41,6 +46,11 @@ HYPOTHESES = {
             
             # 🔴 Holocaust
             "The text denies, trivializes, or distorts the historical facts of the Holocaust.",
+            "The text jokes about the killing of Jews or trivializes the Holocaust through diminishing comparisons.",
+
+            # 🔴 Codes, Slurs & Delegitimizing the antisemitism charge
+            "The text uses slurs, code words, or veiled designations for Jews (e.g., 'goblins', 'kikes', '(((…)))', 'global elite', 'puppet masters').",
+            "The text claims that accusations of antisemitism are misused to silence legitimate criticism of Israel.",
         ],
     },
     "0": {
@@ -54,6 +64,11 @@ HYPOTHESES = {
             "Der Text unterscheidet zwischen einer Regierung, einem Staat, Zionismus oder einzelnen Akteuren und jüdischer Identität als Gruppe.",
             "Der Text enthält keine pauschale negative Zuschreibung gegenüber Juden als religiöse oder ethnische Gemeinschaft.",
             "Der Text verhandelt Politik, Geschichte oder Menschenrechte, ohne Juden kollektiv Motive, Schuld oder Macht zuzuschreiben.",
+
+            # 🟢 Meta-Berichte, Zitate & Nachrichten
+            "Der Text berichtet sachlich über antisemitische Vorfälle, Studien oder Debatten oder verurteilt diese.",
+            "Der Text gibt ein religiöses, literarisches oder historisches Zitat wieder, ohne eine eigene Wertung über Juden hinzuzufügen.",
+            "Der Text ist eine knappe Nachrichtenmeldung, Schlagzeile oder Linkvorschau ohne wertende Aussage über Juden.",
         ],
         "en": [
             # 🟢 Political criticism without collective blame
@@ -65,6 +80,11 @@ HYPOTHESES = {
             "The text distinguishes between a government, a state, Zionism, or individual actors and Jewish identity as a group.",
             "The text contains no blanket negative attribution toward Jews as a religious or ethnic community.",
             "The text addresses politics, history, or human rights without assigning collective motives, guilt, or power to Jews.",
+
+            # 🟢 Meta-reports, quotations & news
+            "The text factually reports on or condemns antisemitic incidents, studies, or debates.",
+            "The text quotes a religious, literary, or historical source without adding its own judgment about Jews.",
+            "The text is a brief news item, headline, or link preview without an evaluative claim about Jews.",
         ],
     },
 }
